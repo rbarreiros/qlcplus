@@ -32,43 +32,50 @@ Rectangle
     property string sectionLabel: ""
     property Component sectionContents
 
-    Rectangle
+    Column
     {
-        id: cPropsHeader
+        id: sectionColumn
         width: parent.width
-        height: 38
-        color: headerMouseArea.containsMouse ? UISettings.highlight : UISettings.sectionHeader
 
-        RobotoText
+        Rectangle
         {
-            x: 2
-            label: boxRoot.sectionLabel
+            id: cPropsHeader
+            width: parent.width
+            height: UISettings.listItemHeight
+            color: headerMouseArea.containsMouse ? UISettings.highlight : UISettings.sectionHeader
+
+            RobotoText
+            {
+                anchors.centerIn: parent
+                label: boxRoot.sectionLabel
+                height: UISettings.listItemHeight
+                fontSize: UISettings.textSizeDefault
+            }
+            Text
+            {
+                x: parent.width - UISettings.listItemHeight
+                anchors.verticalCenter: parent.verticalCenter
+                font.family: "FontAwesome"
+                font.pixelSize: UISettings.textSizeDefault * 1.2
+                text: boxRoot.isExpanded ? FontAwesome.fa_minus_square : FontAwesome.fa_plus_square
+                color: "white"
+            }
+
+            MouseArea
+            {
+                id: headerMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+
+                onClicked: boxRoot.isExpanded = !boxRoot.isExpanded
+            }
         }
-        Text
+
+        Loader
         {
-            x: parent.width - 34
-            anchors.verticalCenter: parent.verticalCenter
-            font.family: "FontAwesome"
-            font.pointSize: 24
-            text: boxRoot.isExpanded ? FontAwesome.fa_minus_square : FontAwesome.fa_plus_square
-            color: "white"
+            id: sectionLoader
+            width: parent.width
+            sourceComponent: isExpanded ? boxRoot.sectionContents : null
         }
-
-        MouseArea
-        {
-            id: headerMouseArea
-            anchors.fill: parent
-            hoverEnabled: true
-
-            onClicked: boxRoot.isExpanded = !boxRoot.isExpanded
-        }
-    }
-
-    Loader
-    {
-        id: sectionLoader
-        y: cPropsHeader.height
-        width: parent.width
-        sourceComponent: boxRoot.sectionContents
     }
 }

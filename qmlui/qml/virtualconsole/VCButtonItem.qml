@@ -20,23 +20,17 @@
 import QtQuick 2.0
 import QtQuick.Layouts 1.1
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
 
 VCWidgetItem
 {
     id: buttonRoot
     property VCButton buttonObj: null
-    property bool isOn: buttonObj ? buttonObj.isOn : false
-    radius: 4
 
-    onIsOnChanged:
-    {
-        if (isOn == false)
-        {
-            // activate the blink effect here
-            blink.start()
-        }
-    }
+    property int btnState: buttonObj ? buttonObj.state : VCButton.Inactive
+    property int btnAction: buttonObj ? buttonObj.actionType : VCButton.Toggle
+
+    radius: 4
 
     gradient: Gradient
     {
@@ -44,17 +38,34 @@ VCWidgetItem
         GradientStop { position: 1 ; color: buttonRoot.color }
     }
 
+    function checkActionType()
+    {
+        if (btnAction === VCButton.Flash)
+            buttonIcon.source = "qrc:/flash.svg"
+        else if (btnAction === VCButton.StopAll)
+            buttonIcon.source = "qrc:/stopall.svg"
+        else if (btnAction === VCButton.Blackout)
+            buttonIcon.source = "qrc:/blackout.svg"
+        else
+            buttonIcon.source = ""
+    }
+
+    onBtnStateChanged:
+    {
+        if (btnState === VCButton.Inactive)
+        {
+            // activate the blink effect here
+            blink.start()
+        }
+    }
+
     onButtonObjChanged:
     {
         setCommonProperties(buttonObj)
-
-        if (buttonObj.actionType === VCButton.Flash)
-            buttonIcon.source = "qrc:/flash.svg"
-        else if (buttonObj.actionType === VCButton.StopAll)
-            buttonIcon.source = "qrc:/stopall.svg"
-        else if (buttonObj.actionType === VCButton.Blackout)
-            buttonIcon.source = "qrc:/blackout.svg"
+        setBgImageMargins(4)
+        checkActionType()
     }
+    onBtnActionChanged: checkActionType()
 
     Rectangle
     {
@@ -65,7 +76,7 @@ VCWidgetItem
         height: parent.height - 2
         color: "transparent"
         border.width: (buttonRoot.width > 80) ? 3 : 2
-        border.color: isOn ? "#00FF00" : "#A0A0A0"
+        border.color: btnState === VCButton.Active ? "#00FF00" : btnState === VCButton.Monitoring ? "orange" : "#A0A0A0"
         radius: 3
 
         Rectangle
@@ -95,7 +106,7 @@ VCWidgetItem
                 z: 2
                 width: parent.width - 4
                 height: parent.height
-                font: buttonObj ? buttonObj.font : null
+                font: buttonObj ? buttonObj.font : ""
                 text: buttonObj ? buttonObj.caption : ""
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter
@@ -127,18 +138,57 @@ VCWidgetItem
             if (virtualConsole.editMode)
                 return;
 
-            if (buttonObj.actionType === VCButton.Toggle)
-                buttonObj.requestStateChange(!buttonObj.isOn)
+            if (buttonObj.actionType === VCButton.Toggle || buttonObj.actionType === VCButton.Blackout)
+            {
+                buttonObj.requestStateChange(btnState === VCButton.Active ? false : true)
+            }
+            else if (buttonObj.actionType !== VCButton.Flash)
+            {
+                buttonObj.requestStateChange(true)
+                blink.start()
+            }
         }
         onPressed:
         {
+            if (virtualConsole.editMode)
+                return;
+
             if (buttonObj.actionType === VCButton.Flash)
                 buttonObj.requestStateChange(true)
         }
         onReleased:
         {
+            if (virtualConsole.editMode)
+                return;
+
             if (buttonObj.actionType === VCButton.Flash)
                 buttonObj.requestStateChange(false)
+        }
+    }
+
+    MultiPointTouchArea
+    {
+        anchors.fill: parent
+        mouseEnabled: false
+        maximumTouchPoints: 1
+
+        onPressed:
+        {
+            if (virtualConsole.editMode)
+                return;
+
+            if (buttonObj.actionType === VCButton.Flash)
+                buttonObj.requestStateChange(true)
+        }
+        onReleased:
+        {
+            if (virtualConsole.editMode)
+                return;
+
+            if (buttonObj.actionType === VCButton.Flash)
+                buttonObj.requestStateChange(false)
+            else if (buttonObj.actionType === VCButton.Toggle)
+                buttonObj.requestStateChange(btnState === VCButton.Active ? false : true)
         }
     }
 
@@ -149,10 +199,13 @@ VCWidgetItem
         z: 2 // this area must be above the VCWidget resize controls
         keys: [ "function" ]
 
+        onEntered: virtualConsole.setDropTarget(buttonRoot, true)
+        onExited: virtualConsole.setDropTarget(buttonRoot, false)
         onDropped:
         {
             // attach function here
-            buttonObj.setFunction(drag.source.funcID)
+            if (drag.source.hasOwnProperty("fromFunctionManager"))
+                buttonObj.functionID = drag.source.itemsList[0]
         }
 
         states: [
@@ -162,7 +215,7 @@ VCWidgetItem
                 PropertyChanges
                 {
                     target: buttonRoot
-                    color: "#9DFF52"
+                    color: UISettings.activeDropArea
                 }
             }
         ]

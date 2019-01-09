@@ -18,21 +18,23 @@
 */
 
 import QtQuick 2.3
-import QtQuick.Controls 1.2
+import QtQuick.Controls 2.1
 import QtQuick.Layouts 1.1
 import "."
 
 Rectangle
 {
     id: colorToolBox
-    width: 400
-    height: 430
+    width: UISettings.bigItemHeight * 3
+    height: UISettings.bigItemHeight * 3.5
     color: UISettings.bgMedium
     border.color: "#666"
     border.width: 2
 
     property bool closeOnSelect: false
-    property color selectedColor
+    property int colorsMask: 0
+    property color currentRGB
+    property color currentWAUV
     property string colorToolQML: "qrc:/ColorToolBasic.qml"
 
     signal colorChanged(real r, real g, real b, real w, real a, real uv)
@@ -41,7 +43,7 @@ Rectangle
     {
         id: colorToolBar
         width: parent.width
-        height: 32
+        height: UISettings.listItemHeight
         z: 10
         gradient:
             Gradient
@@ -54,31 +56,23 @@ Rectangle
         RowLayout
         {
             id: rowLayout1
-            //anchors.horizontalCenter: parent.horizontalCenter
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.top: parent.top
-
+            anchors.fill: parent
             spacing: 5
-            ExclusiveGroup { id: menuBarGroup2 }
+            ButtonGroup { id: ctMenuBarGroup }
 
             MenuBarEntry
             {
                 id: basicView
                 entryText: qsTr("Basic")
-                checkable: true
                 checked: true
                 checkedColor: "green"
                 bgGradient: cBarGradient
-                exclusiveGroup: menuBarGroup2
+                ButtonGroup.group: ctMenuBarGroup
+                mFontSize: UISettings.textSizeDefault
                 onCheckedChanged:
                 {
                     if (checked == true)
-                    {
                         colorToolQML = "qrc:/ColorToolBasic.qml"
-                    }
                 }
             }
 
@@ -86,32 +80,28 @@ Rectangle
             {
                 id: rgbView
                 entryText: qsTr("Full")
-                checkable: true
                 checkedColor: "green"
                 bgGradient: cBarGradient
-                exclusiveGroup: menuBarGroup2
+                ButtonGroup.group: ctMenuBarGroup
+                mFontSize: UISettings.textSizeDefault
                 onCheckedChanged:
                 {
                     if (checked == true)
-                    {
                         colorToolQML = "qrc:/ColorToolFull.qml"
-                    }
                 }
             }
             MenuBarEntry
             {
                 id: filtersView
                 entryText: qsTr("Filters")
-                checkable: true
                 checkedColor: "green"
                 bgGradient: cBarGradient
-                exclusiveGroup: menuBarGroup2
+                ButtonGroup.group: ctMenuBarGroup
+                mFontSize: UISettings.textSizeDefault
                 onCheckedChanged:
                 {
                     if (checked == true)
-                    {
                         colorToolQML = "qrc:/ColorToolFilters.qml"
-                    }
                 }
             }
             // allow the tool to be dragged around
@@ -135,22 +125,27 @@ Rectangle
         height: parent.height - colorToolBar.height
         source: colorToolQML
 
-        onLoaded: item.selectedColor = colorToolBox.selectedColor
+        onLoaded:
+        {
+            item.width = width
+            item.colorsMask = Qt.binding(function() { return colorToolBox.colorsMask })
+            if (item.hasOwnProperty("currentRGB"))
+                item.currentRGB = colorToolBox.currentRGB
+            if (item.hasOwnProperty("currentWAUV"))
+                item.currentWAUV = colorToolBox.currentWAUV
+        }
 
         Connections
         {
              target: toolLoader.item
              ignoreUnknownSignals: true
-             onColorChanged: colorToolBox.colorChanged(r, g, b, white, amber, uv)
+             onColorChanged:
+             {
+                 currentRGB = Qt.rgba(r, g, b, 1.0)
+                 currentWAUV = Qt.rgba(w, a, uv, 1.0)
+                 colorToolBox.colorChanged(r, g, b, w, a, uv)
+             }
              onReleased: if (closeOnSelect) colorToolBox.visible = false
         }
-        /*
-        Connections
-        {
-             target: toolLoader.item
-             ignoreUnknownSignals: true
-             onReleased: if (closeOnSelect) colorToolBox.visible = false
-        }
-        */
     }
 }

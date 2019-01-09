@@ -21,7 +21,6 @@
 #include <sys/time.h>
 
 #include "universe_test.h"
-#include "testmacros.h"
 
 #define protected public
 #include "universe.h"
@@ -48,16 +47,17 @@ void Universe_Test::initial()
     QCOMPARE(m_uni->usedChannels(), ushort(0));
     QCOMPARE(m_uni->totalChannels(), ushort(0));
     QCOMPARE(m_uni->hasChanged(), false);
+    QCOMPARE(m_uni->passthrough(), false);
     QVERIFY(m_uni->inputPatch() == NULL);
     QVERIFY(m_uni->outputPatch() == NULL);
     QVERIFY(m_uni->feedbackPatch() == NULL);
     QVERIFY(m_uni->intensityChannels().isEmpty());
- 
+
     QByteArray const preGM = m_uni->preGMValues();
 
     QCOMPARE(preGM.count(), 512);
 
-    QByteArray const * postGM = m_uni->postGMValues();
+    QByteArray const *postGM = m_uni->postGMValues();
     QVERIFY(postGM != NULL);
     QCOMPARE(postGM->count(), 512);
 
@@ -83,6 +83,56 @@ void Universe_Test::channelCapabilities()
     QVERIFY(m_uni->channelCapabilities(3) == Universe::HTP);
     QVERIFY(m_uni->channelCapabilities(4) == (Universe::Intensity|Universe::HTP));
     QCOMPARE(m_uni->totalChannels(), ushort(5));
+}
+
+void Universe_Test::blendModes()
+{
+    QVERIFY(Universe::blendModeToString(Universe::NormalBlend) == "Normal");
+    QVERIFY(Universe::blendModeToString(Universe::MaskBlend) == "Mask");
+    QVERIFY(Universe::blendModeToString(Universe::AdditiveBlend) == "Additive");
+    QVERIFY(Universe::blendModeToString(Universe::SubtractiveBlend) == "Subtractive");
+
+    QVERIFY(Universe::stringToBlendMode("Foo") == Universe::NormalBlend);
+    QVERIFY(Universe::stringToBlendMode("Normal") == Universe::NormalBlend);
+    QVERIFY(Universe::stringToBlendMode("Mask") == Universe::MaskBlend);
+    QVERIFY(Universe::stringToBlendMode("Additive") == Universe::AdditiveBlend);
+    QVERIFY(Universe::stringToBlendMode("Subtractive") == Universe::SubtractiveBlend);
+
+    m_uni->setChannelCapability(0, QLCChannel::Intensity);
+    m_uni->setChannelCapability(4, QLCChannel::Intensity);
+    m_uni->setChannelCapability(9, QLCChannel::Intensity);
+    m_uni->setChannelCapability(11, QLCChannel::Intensity);
+
+    QVERIFY(m_uni->write(0, 255) == true);
+    QVERIFY(m_uni->write(4, 128) == true);
+    QVERIFY(m_uni->write(9, 100) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(0)), quint8(255));
+    QCOMPARE(quint8(m_uni->postGMValues()->at(4)), quint8(128));
+    QCOMPARE(quint8(m_uni->postGMValues()->at(9)), quint8(100));
+    QCOMPARE(quint8(m_uni->postGMValues()->at(11)), quint8(0));
+
+    /* check masking on 0 remains 0 */
+    QVERIFY(m_uni->writeBlended(11, 128, Universe::MaskBlend) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(11)), quint8(0));
+
+    /* check 180 masked on 128 gets halved */
+    QVERIFY(m_uni->writeBlended(4, 180, Universe::MaskBlend) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(4)), quint8(90));
+
+    /* chek adding 50 to 100 is actually 150 */
+    QVERIFY(m_uni->writeBlended(9, 50, Universe::AdditiveBlend) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(9)), quint8(150));
+
+    /* chek subtracting 55 to 255 is actually 200 */
+    QVERIFY(m_uni->writeBlended(0, 55, Universe::SubtractiveBlend) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(0)), quint8(200));
+
+    QVERIFY(m_uni->writeBlended(0, 255, Universe::SubtractiveBlend) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(0)), quint8(0));
+
+    /* check an unknown blend mode */
+    QVERIFY(m_uni->writeBlended(9, 255, Universe::BlendMode(42)) == true);
+    QCOMPARE(quint8(m_uni->postGMValues()->at(9)), quint8(150));
 }
 
 void Universe_Test::grandMasterIntensityReduce()
@@ -366,6 +416,176 @@ void Universe_Test::reset()
     m_uni->reset();
     for (i = 0; i < 128; i++)
         QCOMPARE((int)m_uni->postGMValues()->at(i), 0);
+}
+
+void Universe_Test::loadEmpty()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    xmlWriter.writeStartElement("Universe");
+    xmlWriter.writeAttribute("Name", "Universe 123");
+    //xmlWriter.writeAttribute("ID", "1");
+
+    xmlWriter.writeEndDocument();
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QVERIFY(m_uni->loadXML(xmlReader, 0, 0) == true);
+    QCOMPARE(m_uni->name(), QString("Universe 123"));
+    //QCOMPARE(m_uni->id(), 1U);
+    QCOMPARE(m_uni->passthrough(), false);
+}
+
+void Universe_Test::loadPassthroughTrue()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    xmlWriter.writeStartElement("Universe");
+    xmlWriter.writeAttribute("Name", "Universe 123");
+    //xmlWriter.writeAttribute("ID", "1");
+    xmlWriter.writeAttribute("Passthrough", "True");
+
+    xmlWriter.writeEndDocument();
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QVERIFY(m_uni->loadXML(xmlReader, 0, 0) == true);
+    QCOMPARE(m_uni->name(), QString("Universe 123"));
+    //QCOMPARE(m_uni->id(), 1U);
+    QCOMPARE(m_uni->passthrough(), true);
+}
+
+void Universe_Test::loadPassthrough1()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    xmlWriter.writeStartElement("Universe");
+    xmlWriter.writeAttribute("Name", "Universe 123");
+    //xmlWriter.writeAttribute("ID", "1");
+    xmlWriter.writeAttribute("Passthrough", "1");
+
+    xmlWriter.writeEndDocument();
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QVERIFY(m_uni->loadXML(xmlReader, 0, 0) == true);
+    QCOMPARE(m_uni->name(), QString("Universe 123"));
+    //QCOMPARE(m_uni->id(), 1U);
+    QCOMPARE(m_uni->passthrough(), true);
+}
+
+void Universe_Test::loadWrong()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    xmlWriter.writeStartElement("U");
+    xmlWriter.writeAttribute("Name", "Universe 123");
+    //xmlWriter.writeAttribute("ID", "1");
+    xmlWriter.writeAttribute("Passthrough", "1");
+
+    xmlWriter.writeEndDocument();
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QVERIFY(m_uni->loadXML(xmlReader, 0, 0) == false);
+}
+
+void Universe_Test::loadPassthroughFalse()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    xmlWriter.writeStartElement("Universe");
+    xmlWriter.writeAttribute("Name", "Universe 123");
+    //xmlWriter.writeAttribute("ID", "1");
+    xmlWriter.writeAttribute("Passthrough", "False");
+
+    xmlWriter.writeEndDocument();
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QVERIFY(m_uni->loadXML(xmlReader, 0, 0) == true);
+    QCOMPARE(m_uni->name(), QString("Universe 123"));
+    //QCOMPARE(m_uni->id(), 1U);
+    QCOMPARE(m_uni->passthrough(), false);
+}
+
+void Universe_Test::saveEmpty()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    m_uni->setName("Universe 123");
+    m_uni->setID(1);
+
+    QVERIFY(m_uni->saveXML(&xmlWriter) == true);
+
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QCOMPARE(xmlReader.name().toString(), QString("Universe"));
+    QCOMPARE(xmlReader.attributes().value("Name").toString(), QString("Universe 123"));
+    QCOMPARE(xmlReader.attributes().value("ID").toString(), QString("1"));
+    QCOMPARE(xmlReader.attributes().hasAttribute("Passthrough"), false);
+}
+
+void Universe_Test::savePasthroughTrue()
+{
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    m_uni->setName("Universe 123");
+    m_uni->setID(1);
+    m_uni->setPassthrough(true);
+
+    QVERIFY(m_uni->saveXML(&xmlWriter) == true);
+
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+
+    QCOMPARE(xmlReader.name().toString(), QString("Universe"));
+    QCOMPARE(xmlReader.attributes().value("Name").toString(), QString("Universe 123"));
+    QCOMPARE(xmlReader.attributes().value("ID").toString(), QString("1"));
+    QCOMPARE(xmlReader.attributes().value("Passthrough").toString(), QString("True"));
 }
 
 void Universe_Test::setGMValueEfficiency()

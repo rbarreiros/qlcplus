@@ -10,7 +10,7 @@ QT     += core gui script network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets multimedia
 
 INCLUDEPATH     += qhttpserver
-INCLUDEPATH     += ../../engine/src ../../engine/audio/src 
+INCLUDEPATH     += ../../engine/src ../../engine/audio/src
 INCLUDEPATH     += ../../ui/src ../../ui/src/virtualconsole
 DEPENDPATH      += ../../engine/src ../../ui/src
 QMAKE_LIBDIR    += ../../engine/src ../../ui/src
@@ -37,8 +37,8 @@ HEADERS = qhttpserver/http_parser.h \
           qhttpserver/qhttpserver.h \
           qhttpserver/qhttprequest.h \
           qhttpserver/qhttpresponse.h \
-          qhttpserver/qhttpserverapi.h
-          
+          qhttpserver/qhttpserverfwd.h
+
 SOURCES = qhttpserver/http_parser.c \
           qhttpserver/qhttpconnection.cpp \
           qhttpserver/qhttprequest.cpp \
@@ -49,16 +49,18 @@ SOURCES = qhttpserver/http_parser.c \
 HEADERS += commonjscss.h \
            webaccess.h \
            webaccessconfiguration.h \
-           webaccesssimpledesk.h
+           webaccesssimpledesk.h \
+           webaccessauth.h
 
 unix:!macx: HEADERS += webaccessnetwork.h
 
 SOURCES += webaccess.cpp \
            webaccessconfiguration.cpp \
-           webaccesssimpledesk.cpp
+           webaccesssimpledesk.cpp \
+           webaccessauth.cpp
 
 unix:!macx: SOURCES += webaccessnetwork.cpp
-           
+
 TRANSLATIONS += webaccess_fi_FI.ts
 TRANSLATIONS += webaccess_de_DE.ts
 TRANSLATIONS += webaccess_fr_FR.ts
@@ -68,11 +70,12 @@ TRANSLATIONS += webaccess_nl_NL.ts
 TRANSLATIONS += webaccess_cz_CZ.ts
 TRANSLATIONS += webaccess_pt_BR.ts
 TRANSLATIONS += webaccess_ca_ES.ts
-    
+TRANSLATIONS += webaccess_ja_JP.ts
+
 macx {
     # This must be after "TARGET = " and before target installation so that
     # install_name_tool can be run before target installation
-    include(../../macx/nametool.pri)
+    include(../../platforms/macos/nametool.pri)
 }
 
 target.path = $$INSTALLROOT/$$LIBSDIR

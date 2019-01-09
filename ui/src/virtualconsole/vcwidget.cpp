@@ -62,6 +62,7 @@ VCWidget::VCWidget(QWidget* parent, Doc* doc)
     , m_page(0)
     , m_allowChildren(false)
     , m_allowResize(true)
+    , m_intensityOverrideId(Function::invalidAttributeId())
     , m_intensity(1.0)
     , m_liveEdit(VirtualConsole::instance()->liveEdit())
 {
@@ -89,14 +90,11 @@ VCWidget::VCWidget(QWidget* parent, Doc* doc)
     connect(m_doc, SIGNAL(modeChanged(Doc::Mode)),
             this, SLOT(slotModeChanged(Doc::Mode)));
 
-    /* Listen to parent's (only VCWidget-kind) key signals */
-    if (parent->inherits(metaObject()->className()) == true)
-    {
-        connect(parent, SIGNAL(keyPressed(const QKeySequence&)),
-                this, SLOT(slotKeyPressed(const QKeySequence&)));
-        connect(parent,	SIGNAL(keyReleased(const QKeySequence&)),
-                this, SLOT(slotKeyReleased(const QKeySequence&)));
-    }
+    /* Listen to the virtual console key signals */
+    connect(VirtualConsole::instance(), SIGNAL(keyPressed(const QKeySequence&)),
+            this, SLOT(slotKeyPressed(const QKeySequence&)));
+    connect(VirtualConsole::instance(), SIGNAL(keyReleased(const QKeySequence&)),
+            this, SLOT(slotKeyReleased(const QKeySequence&)));
 }
 
 VCWidget::~VCWidget()
@@ -519,12 +517,30 @@ void VCWidget::editProperties()
  * Intensity
  *********************************************************************/
 
+void VCWidget::adjustFunctionIntensity(Function *f, qreal value)
+{
+    if (f == NULL)
+        return;
+
+    //qDebug() << "adjustFunctionIntensity" << caption() << "value" << value;
+
+    if (m_intensityOverrideId == Function::invalidAttributeId())
+        m_intensityOverrideId = f->requestAttributeOverride(Function::Intensity, value);
+    else
+        f->adjustAttribute(value, m_intensityOverrideId);
+}
+
+void VCWidget::resetIntensityOverrideAttribute()
+{
+    m_intensityOverrideId = Function::invalidAttributeId();
+}
+
 void VCWidget::adjustIntensity(qreal val)
 {
     m_intensity = val;
 }
 
-qreal VCWidget::intensity()
+qreal VCWidget::intensity() const
 {
     return m_intensity;
 }
@@ -532,6 +548,14 @@ qreal VCWidget::intensity()
 /*****************************************************************************
  * External input
  *****************************************************************************/
+
+bool VCWidget::acceptsInput()
+{
+    if (mode() == Doc::Design || isEnabled() == false || isDisabled())
+        return false;
+
+    return true;
+}
 
 bool VCWidget::checkInputSource(quint32 universe, quint32 channel,
                                 uchar value, QObject *sender, quint32 id)
@@ -587,7 +611,8 @@ void VCWidget::setInputSource(QSharedPointer<QLCInputSource> const& source, quin
         {
             if (ip->profile() != NULL)
             {
-                QLCInputChannel *ich = ip->profile()->channel(source->channel());
+                // Do not care about the page since input profiles don't do either
+                QLCInputChannel *ich = ip->profile()->channel(source->channel() & 0xFFFF);
                 if (ich != NULL)
                 {
                     if (ich->movementType() == QLCInputChannel::Relative)
@@ -604,11 +629,18 @@ void VCWidget::setInputSource(QSharedPointer<QLCInputSource> const& source, quin
                         connect(source.data(), SIGNAL(inputValueChanged(quint32,quint32,uchar)),
                                 this, SLOT(slotInputValueChanged(quint32,quint32,uchar)));
                     }
-                    else if (ich->sendExtraPress() == true)
+                    else if (ich->type() == QLCInputChannel::Button)
                     {
-                        source->setSendExtraPressRelease(true);
-                        connect(source.data(), SIGNAL(inputValueChanged(quint32,quint32,uchar)),
-                                this, SLOT(slotInputValueChanged(quint32,quint32,uchar)));
+                        if (ich->sendExtraPress() == true)
+                        {
+                            source->setSendExtraPressRelease(true);
+                            connect(source.data(), SIGNAL(inputValueChanged(quint32,quint32,uchar)),
+                                    this, SLOT(slotInputValueChanged(quint32,quint32,uchar)));
+                        }
+
+                        // user custom feedbacks have precedence over input profile custom feedbacks
+                        source->setRange((source->lowerValue() != 0) ? source->lowerValue() : ich->lowerValue(),
+                                         (source->upperValue() != UCHAR_MAX) ? source->upperValue() : ich->upperValue());
                     }
                 }
             }
@@ -649,29 +681,32 @@ void VCWidget::sendFeedback(int value, quint8 id)
 
 void VCWidget::sendFeedback(int value, QSharedPointer<QLCInputSource> src)
 {
-    if (!src.isNull() && src->isValid() == true)
+    if (src.isNull() || src->isValid() == false)
+        return;
+
+    // if in relative mode, send a "feedback" to this
+    // input source so it can continue to emit values
+    // from the right position
+    if (src->needsUpdate())
+        src->updateOuputValue(value);
+
+    if (acceptsInput() == false)
+        return;
+
+    QString chName = QString();
+
+    InputPatch* pat = m_doc->inputOutputMap()->inputPatch(src->universe());
+    if (pat != NULL)
     {
-        // if in relative mode, send a "feedback" to this
-        // input source so it can continue to emit values
-        // from the right position
-        if (src->needsUpdate())
-            src->updateOuputValue(value);
-
-        QString chName = QString();
-
-        InputPatch* pat = m_doc->inputOutputMap()->inputPatch(src->universe());
-        if (pat != NULL)
+        QLCInputProfile* profile = pat->profile();
+        if (profile != NULL)
         {
-            QLCInputProfile* profile = pat->profile();
-            if (profile != NULL)
-            {
-                QLCInputChannel* ich = profile->channel(src->channel());
-                if (ich != NULL)
-                    chName = ich->name();
-            }
+            QLCInputChannel* ich = profile->channel(src->channel());
+            if (ich != NULL)
+                chName = ich->name();
         }
-        m_doc->inputOutputMap()->sendFeedBack(src->universe(), src->channel(), value, chName);
     }
+    m_doc->inputOutputMap()->sendFeedBack(src->universe(), src->channel(), value, chName);
 }
 
 void VCWidget::slotInputValueChanged(quint32 universe, quint32 channel, uchar value)
@@ -834,14 +869,8 @@ bool VCWidget::loadXMLAppearance(QXmlStreamReader &root)
     return true;
 }
 
-bool VCWidget::loadXMLInput(QXmlStreamReader &root, const quint8 &id)
+QSharedPointer<QLCInputSource> VCWidget::getXMLInput(QXmlStreamReader &root)
 {
-    if (root.device() == NULL || root.hasError())
-        return false;
-
-    if (root.name() != KXMLQLCVCWidgetInput)
-        return false;
-
     QXmlStreamAttributes attrs = root.attributes();
 
     quint32 uni = attrs.value(KXMLQLCVCWidgetInputUniverse).toString().toUInt();
@@ -855,6 +884,19 @@ bool VCWidget::loadXMLInput(QXmlStreamReader &root, const quint8 &id)
         max = uchar(attrs.value(KXMLQLCVCWidgetInputUpperValue).toString().toUInt());
 
     newSrc->setRange(min, max);
+
+    return newSrc;
+}
+
+bool VCWidget::loadXMLInput(QXmlStreamReader &root, const quint8 &id)
+{
+    if (root.device() == NULL || root.hasError())
+        return false;
+
+    if (root.name() != KXMLQLCVCWidgetInput)
+        return false;
+
+    QSharedPointer<QLCInputSource>newSrc = getXMLInput(root);
 
     setInputSource(newSrc, id);
 
@@ -973,7 +1015,7 @@ bool VCWidget::saveXMLInput(QXmlStreamWriter *doc)
 }
 
 bool VCWidget::saveXMLInput(QXmlStreamWriter *doc,
-                            const QLCInputSource *src) const
+                            const QLCInputSource *src)
 {
     Q_ASSERT(doc != NULL);
 
@@ -996,7 +1038,7 @@ bool VCWidget::saveXMLInput(QXmlStreamWriter *doc,
 }
 
 bool VCWidget::saveXMLInput(QXmlStreamWriter *doc,
-                      QSharedPointer<QLCInputSource> const& src) const
+                      QSharedPointer<QLCInputSource> const& src)
 {
     return saveXMLInput(doc, src.data());
 }
@@ -1357,4 +1399,3 @@ void VCWidget::mouseMoveEvent(QMouseEvent* e)
         QWidget::mouseMoveEvent(e);
     }
 }
-

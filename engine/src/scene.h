@@ -74,32 +74,26 @@ public:
      */
     ~Scene();
 
+    /** @reimp */
+    QIcon getIcon() const;
+
     void setChildrenFlag(bool flag);
 
-    /** @reimpl */
+    /** @reimp */
     quint32 totalDuration();
 
 private:
     quint32 m_legacyFadeBus;
 
-    /** flag that says if a scene is used by some Chaser in sequence mode */
-    bool m_hasChildren;
-
     /*********************************************************************
      * Copying
      *********************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     Function* createCopy(Doc* doc, bool addToDoc = true);
 
-    /** @reimpl */
+    /** @reimp */
     bool copyFrom(const Function* function);
-
-    /*********************************************************************
-     * UI State
-     *********************************************************************/
-private:
-    virtual FunctionUiState * createUiState();
 
     /*********************************************************************
      * Values
@@ -135,6 +129,9 @@ public:
      */
     QList <SceneValue> values() const;
 
+    /** @reimp */
+    QList<quint32> components();
+
     /**
      * Try to retrieve a RGB/CMY color if the Scene has RGB/CMY channels set.
      * A fixture ID can be specified to retrieve a single fixture color.
@@ -146,6 +143,9 @@ public:
      * Clear all values
      */
     void clear();
+
+signals:
+    void valueChanged(SceneValue scv);
 
 protected:
     QMap <SceneValue, uchar> m_values;
@@ -193,22 +193,22 @@ public slots:
 public:
     void addFixture(quint32 fixtureId);
     bool removeFixture(quint32 fixtureId);
-    QSet<quint32> fixtures() const;
+    QList<quint32> fixtures() const;
 
 private:
-    QSet<quint32> m_fixtures;
+    QList<quint32> m_fixtures;
 
     /*********************************************************************
      * Load & Save
      *********************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     bool saveXML(QXmlStreamWriter *doc);
 
-    /** @reimpl */
+    /** @reimp */
     bool loadXML(QXmlStreamReader &root);
 
-    /** @reimpl */
+    /** @reimp */
     void postLoad();
 
 private:
@@ -218,41 +218,38 @@ private:
      * Flash
      *********************************************************************/
 public:
-    /** @reimpl */
-    void flash(MasterTimer* timer);
+    /** @reimp */
+    void flash(MasterTimer *timer);
 
-    /** @reimpl */
-    void unFlash(MasterTimer* timer);
+    /** @reimp */
+    void unFlash(MasterTimer *timer);
 
-    /** @reimpl from DMXSource */
-    void writeDMX(MasterTimer* timer, QList<Universe*> ua);
+    /** @reimp from DMXSource */
+    void writeDMX(MasterTimer *timer, QList<Universe*> ua);
 
     /*********************************************************************
      * Running
      *********************************************************************/
 public:
-    /** @reimpl */
-    void preRun(MasterTimer* timer);
+    /** @reimp */
+    void write(MasterTimer *timer, QList<Universe*> ua);
 
-    /** @reimpl */
-    void write(MasterTimer* timer, QList<Universe*> ua);
-
-    /** @reimpl */
-    void postRun(MasterTimer* timer, QList<Universe*> ua);
-
-private:
-    /** Insert starting values to $fc, either from $timer->fader() or $ua */
-    void insertStartValue(FadeChannel& fc, const MasterTimer* timer, const QList<Universe *> ua);
-
-private:
-    GenericFader* m_fader;
+    /** @reimp */
+    void postRun(MasterTimer *timer, QList<Universe*> ua);
 
     /*********************************************************************
      * Attributes
      *********************************************************************/
 public:
-    /** @reimpl */
-    void adjustAttribute(qreal fraction, int attributeIndex);
+    /** @reimp */
+    int adjustAttribute(qreal fraction, int attributeId);
+
+    /*************************************************************************
+     * Blend mode
+     *************************************************************************/
+public:
+    /** @reimp */
+    void setBlendMode(Universe::BlendMode mode);
 };
 
 /** @} */

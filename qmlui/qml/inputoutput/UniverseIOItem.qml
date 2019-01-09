@@ -19,46 +19,35 @@
 
 import QtQuick 2.0
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
 import "."
 
 Rectangle
 {
     id: uniItem
     width: parent.width
-    height: 120
-    color: isSelected ? "#2D444E" : "transparent"
+    height: itemHeight ? itemHeight : UISettings.bigItemHeight
+    color: isSelected ? UISettings.highlightPressed : "transparent"
     border.width: 2
     border.color: isSelected ? UISettings.selection : "transparent"
+    z: isSelected ? 5 : 1
 
+    property int itemHeight: Math.max(inputPatchesNumber, outputPatchesNumber) * UISettings.bigItemHeight
     property Universe universe
-    property bool isSelected: false
-    property int outputPatchesNumber: 0
-    property int inputPatchesNumber: 0
+    property bool isSelected: universe && ioManager.selectedIndex === universe.id ? true : false
+    property int outputPatchesNumber: universe ? universe.outputPatchesCount : 0
+    property int inputPatchesNumber: iPatch == null ? 0 : 1
     property int wireBoxWidth: (uniItem.width - uniBox.width) / 8 // one quarter of a uniItem side
     property InputPatch iPatch: universe ? universe.inputPatch : null
-    property OutputPatch oPatch: universe ? universe.outputPatch : null
-
-    onIPatchChanged:
-    {
-        if (iPatch === null)
-            inputPatchesNumber = 0
-        else
-            inputPatchesNumber = 1
-        inDropRect.color = "transparent"
-    }
-
-    onOPatchChanged:
-    {
-        if (oPatch === null)
-            outputPatchesNumber = 0
-        else
-            outputPatchesNumber = 1
-        outDropRect.color = "transparent"
-    }
 
     signal selected(int index)
     signal patchDragging(bool status)
+
+    onIsSelectedChanged:
+    {
+        if (isSelected == false)
+            uniNameEdit.enableEditing(false)
+    }
 
     // area containing the input patches
     Column
@@ -110,7 +99,7 @@ Rectangle
                             id: ipItem
                             width: ipRoot.width
 
-                            universeID: universe.id
+                            universeID: universe ? universe.id : -1
                             patch: universe ? universe.inputPatch : null
 
                             Drag.active: ipMouseArea.drag.active
@@ -118,6 +107,8 @@ Rectangle
                             Drag.hotSpot.x: width / 2
                             Drag.hotSpot.y: height / 2
                             Drag.keys: [ "removePatch" ]
+
+                            onRemoveProfile: ioManager.setInputProfile(universe.id, "")
 
                             DropArea
                             {
@@ -142,13 +133,13 @@ Rectangle
                                             }
                                         }
                                     ]
-                                }
-                            }
-                        }
-                    }
-                }
-        }
-    }
+                                } // Rectangle
+                            } // DropArea
+                        } // InputPatchItem
+                    } // MouseArea
+                } // Item
+        } // Repeater
+    } // Column
 
     // Input patches wires box
     PatchWireBox
@@ -160,13 +151,14 @@ Rectangle
         z: 10
 
         patchesNumber: inputPatchesNumber
+        showFeedback: universe ? universe.hasFeedbacks : false
     }
 
     // Input patch drop area
     DropArea
     {
         id: inputDropTarget
-        x: inputBox.x
+        x: 2
         y: 2
         width: ((uniItem.width - uniBox.width) / 2) - 6
         height: uniItem.height - 4
@@ -179,18 +171,7 @@ Rectangle
         {
             id: inDropRect
             anchors.fill: parent
-            color: "transparent"
-            states: [
-                State
-                {
-                    when: inputDropTarget.containsDrag
-                    PropertyChanges
-                    {
-                        target: inDropRect
-                        color: "#3356FF56"
-                    }
-                }
-            ]
+            color: inputDropTarget.containsDrag ? UISettings.highlight : "transparent"
         }
     }
 
@@ -199,27 +180,109 @@ Rectangle
     {
         id: uniBox
         anchors.centerIn: parent
-        width: 200
-        height: 100
+        z: 5
+        width: UISettings.bigItemHeight * 1.2
+        height: UISettings.bigItemHeight * 0.8
         radius: 5
         //color: "#1C2255"
         gradient:
             Gradient
             {
                 id: bgGradient
-                GradientStop { position: 0 ; color: "#1C2255" }
-                GradientStop { position: 1 ; color: "#2B3483" }
+                GradientStop { position: 0 ; color: UISettings.highlightPressed }
+                GradientStop { position: 1 ; color: UISettings.highlight }
             }
         border.width: 2
         border.color: "#111"
 
-        RobotoText
+        EditableTextBox
         {
-            height: parent.height
+            id: uniNameEdit
+            anchors.centerIn: parent
             width: parent.width
-            label: universe ? universe.name : ""
-            wrapText: true
-            textAlign: Text.AlignHCenter
+            maximumHeight: parent.height
+            color: "transparent"
+            inputText: universe ? universe.name : ""
+            textAlignment: Text.AlignHCenter
+
+            onClicked:
+            {
+                enableEditing(false)
+
+                ioManager.selectedIndex = universe.id
+                uniItem.selected(universe.id);
+            }
+
+            onTextChanged: if (universe) universe.name = text
+        }
+
+        Canvas
+        {
+            id: passthrough
+            anchors.fill: parent
+            visible: ptCheckButton.checked
+            contextType: "2d"
+
+            onPaint:
+            {
+                var vCenter = (height / 2) - 4
+                var wireMargin = width / 20
+                context.strokeStyle = "yellow"
+                context.lineWidth = 3
+                context.beginPath()
+                context.clearRect(0, 0, width, height)
+
+                context.moveTo(0, vCenter)
+                context.lineTo(wireMargin, vCenter)
+                context.lineTo(wireMargin, height - wireMargin)
+                context.lineTo(width - wireMargin, height - wireMargin)
+                context.lineTo(width - wireMargin, vCenter)
+                context.lineTo(width, vCenter)
+                context.stroke()
+            }
+        }
+
+        IconButton
+        {
+            id: ptCheckButton
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            checkedColor: UISettings.selection
+            width: UISettings.iconSizeMedium * 0.8
+            height: UISettings.iconSizeMedium * 0.8
+            faSource: FontAwesome.fa_long_arrow_right
+            checkable: true
+            tooltip: qsTr("Passthrough")
+            checked: universe ? universe.passthrough : false
+            onToggled: if (universe) universe.passthrough = checked
+        }
+
+        IconButton
+        {
+            id: fbButton
+            z: 2
+            visible: inputPatchesNumber
+            anchors.bottom: parent.bottom
+            width: UISettings.iconSizeMedium * 0.8
+            height: UISettings.iconSizeMedium * 0.8
+            checkedColor: "green"
+            imgSource: ""
+            checkable: true
+            checked: universe ? universe.hasFeedbacks : false
+            tooltip: qsTr("Enable/Disable feedbacks")
+            onToggled:
+            {
+                if (universe)
+                    ioManager.setFeedbackPatch(universe.id, checked)
+            }
+
+            RobotoText
+            {
+                anchors.centerIn: parent
+                label: "F"
+                fontSize: UISettings.textSizeDefault * 1.1
+                fontBold: true
+            }
         }
     }
 
@@ -240,8 +303,9 @@ Rectangle
     {
         id: outputBox
         x: outWireBox.x + outWireBox.width - 8
+        y: ((outputPatchesNumber * UISettings.bigItemHeight) - outputBox.height) / 2
         z: 1
-        anchors.verticalCenter: uniItem.verticalCenter
+        spacing: 5
 
         Repeater
         {
@@ -271,7 +335,7 @@ Rectangle
                             if (opItem.Drag.target !== null)
                             {
                                 opItem.Drag.active = false
-                                ioManager.removeOutputPatch(universe.id)
+                                ioManager.removeOutputPatch(universe.id, model.index)
                             }
                             else
                             {
@@ -287,7 +351,8 @@ Rectangle
                             width: opRoot.width
 
                             universeID: universe.id
-                            patch: universe ? universe.outputPatch : null
+                            patch: universe ? universe.outputPatch(index) : null
+                            patchIndex: index
 
                             Drag.active: opMouseArea.drag.active
                             Drag.source: opMouseArea
@@ -298,39 +363,46 @@ Rectangle
                     }
                 }
         }
-    }
+    } // Column
 
-    // Output patch drop area
+    // New output patch drop area
     DropArea
     {
         id: outputDropTarget
         x: outWireBox.x + 6
-        y: 2
+        y: outputBox.y + outputBox.height + 2
         width: ((uniItem.width - uniBox.width) / 2) - 6
-        height: uniItem.height - 4
+        height: UISettings.bigItemHeight * 0.9
 
         // this key must match the one in PluginList, to avoid dropping
         // an input plugin on output and vice-versa
         keys: [ universe ? "output-" + universe.id : "" ]
 
+        onDropped:
+        {
+            console.log("Requested to add a new output patch")
+            ioManager.setOutputPatch(drag.source.pluginUniverse, drag.source.pluginName,
+                                     drag.source.pluginLine, outputPatchesNumber)
+        }
+
         Rectangle
         {
             id: outDropRect
             anchors.fill: parent
-            color: "transparent"
+            color: outputDropTarget.containsDrag ? UISettings.highlight : "transparent"
             states: [
                 State
                 {
                     when: outputDropTarget.containsDrag
+
                     PropertyChanges
                     {
-                        target: outDropRect
-                        color: "#3356FF56"
+                        target: uniItem
+                        itemHeight: (outputPatchesNumber + 1) * UISettings.bigItemHeight
                     }
                 }
             ]
         }
-
     }
 
     // Global mouse area to select this Universe item
@@ -340,12 +412,8 @@ Rectangle
 
         onClicked:
         {
-            if (isSelected == false)
-            {
-                isSelected = true
-                ioManager.setSelectedItem(uniItem, universe.id)
-                uniItem.selected(universe.id);
-            }
+            ioManager.selectedIndex = universe.id
+            uniItem.selected(universe.id);
         }
     }
 

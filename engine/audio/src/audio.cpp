@@ -45,27 +45,22 @@
 
 #define KXMLQLCAudioSource "Source"
 #define KXMLQLCAudioDevice "Device"
-#define KXMLQLCAudioStartTime "StartTime"
-#define KXMLQLCAudioColor "Color"
-#define KXMLQLCAudioLocked "Locked"
 
 /*****************************************************************************
  * Initialization
  *****************************************************************************/
 
 Audio::Audio(Doc* doc)
-  : Function(doc, Function::Audio)
+  : Function(doc, Function::AudioType)
   , m_doc(doc)
   , m_decoder(NULL)
   , m_audio_out(NULL)
   , m_audioDevice(QString())
-  , m_startTime(UINT_MAX)
-  , m_color(96, 128, 83)
-  , m_locked(false)
   , m_sourceFileName("")
   , m_audioDuration(0)
 {
     setName(tr("New Audio"));
+    setRunOrder(Audio::SingleShot);
 
     // Listen to member Function removals
     connect(doc, SIGNAL(functionRemoved(quint32)),
@@ -81,6 +76,11 @@ Audio::~Audio()
     }
     if (m_decoder != NULL)
         delete m_decoder;
+}
+
+QIcon Audio::getIcon() const
+{
+    return QIcon(":/audio.png");
 }
 
 /*****************************************************************************
@@ -114,7 +114,6 @@ bool Audio::copyFrom(const Function* function)
 
     setSourceFileName(aud->m_sourceFileName);
     m_audioDuration = aud->m_audioDuration;
-    m_color = aud->m_color;
 
     return Function::copyFrom(function);
 }
@@ -127,39 +126,17 @@ QStringList Audio::getCapabilities()
 /*********************************************************************
  * Properties
  *********************************************************************/
-void Audio::setStartTime(quint32 time)
-{
-    m_startTime = time;
-}
-
-quint32 Audio::getStartTime() const
-{
-    return m_startTime;
-}
-
 quint32 Audio::totalDuration()
 {
     return (quint32)m_audioDuration;
 }
 
-void Audio::setColor(QColor color)
+void Audio::setTotalDuration(quint32 msec)
 {
-    m_color = color;
-}
+    qDebug() << "Audio set total duration:" << msec;
+    m_audioDuration = msec;
 
-QColor Audio::getColor()
-{
-    return m_color;
-}
-
-void Audio::setLocked(bool locked)
-{
-    m_locked = locked;
-}
-
-bool Audio::isLocked()
-{
-    return m_locked;
+    emit totalDurationChanged();
 }
 
 bool Audio::setSourceFileName(QString filename)
@@ -183,7 +160,7 @@ bool Audio::setSourceFileName(QString filename)
     else
     {
         setName(tr("File not found"));
-        m_audioDuration = 0;
+        //m_audioDuration = 0;
         emit changed(id());
         return true;
     }
@@ -193,7 +170,8 @@ bool Audio::setSourceFileName(QString filename)
     if (m_decoder == NULL)
         return false;
 
-    m_audioDuration = m_decoder->totalTime();
+    setTotalDuration(m_decoder->totalTime());
+
     emit changed(id());
 
     return true;
@@ -204,7 +182,7 @@ QString Audio::getSourceFileName()
     return m_sourceFileName;
 }
 
-AudioDecoder* Audio::getAudioDecoder()
+AudioDecoder *Audio::getAudioDecoder()
 {
     return m_decoder;
 }
@@ -219,11 +197,14 @@ QString Audio::audioDevice()
     return m_audioDevice;
 }
 
-void Audio::adjustAttribute(qreal fraction, int attributeIndex)
+int Audio::adjustAttribute(qreal fraction, int attributeId)
 {
-    if (m_audio_out != NULL && attributeIndex == Intensity)
-        m_audio_out->adjustIntensity(fraction);
-    Function::adjustAttribute(fraction, attributeIndex);
+    int attrIndex = Function::adjustAttribute(fraction, attributeId);
+
+    if (m_audio_out != NULL && attrIndex == Intensity)
+        m_audio_out->adjustIntensity(getAttributeValue(Function::Intensity));
+
+    return attrIndex;
 }
 
 void Audio::slotEndOfStream()
@@ -261,7 +242,11 @@ bool Audio::saveXML(QXmlStreamWriter *doc)
     /* Speed */
     saveXMLSpeed(doc);
 
+    /* Playback mode */
+    saveXMLRunOrder(doc);
+
     doc->writeStartElement(KXMLQLCAudioSource);
+
     if (m_audioDevice.isEmpty() == false)
         doc->writeAttribute(KXMLQLCAudioDevice, m_audioDevice);
 
@@ -283,7 +268,7 @@ bool Audio::loadXML(QXmlStreamReader &root)
         return false;
     }
 
-    if (root.attributes().value(KXMLQLCFunctionType).toString() != typeToString(Function::Audio))
+    if (root.attributes().value(KXMLQLCFunctionType).toString() != typeToString(Function::AudioType))
     {
         qWarning() << Q_FUNC_INFO << root.attributes().value(KXMLQLCFunctionType).toString()
                    << "is not Audio";
@@ -299,17 +284,15 @@ bool Audio::loadXML(QXmlStreamReader &root)
             QXmlStreamAttributes attrs = root.attributes();
             if (attrs.hasAttribute(KXMLQLCAudioDevice))
                 setAudioDevice(attrs.value(KXMLQLCAudioDevice).toString());
-            if (attrs.hasAttribute(KXMLQLCAudioStartTime))
-                setStartTime(attrs.value(KXMLQLCAudioStartTime).toString().toUInt());
-            if (attrs.hasAttribute(KXMLQLCAudioColor))
-                setColor(QColor(attrs.value(KXMLQLCAudioColor).toString()));
-            if (attrs.hasAttribute(KXMLQLCAudioLocked))
-                setLocked(true);
             setSourceFileName(m_doc->denormalizeComponentPath(root.readElementText()));
         }
         else if (root.name() == KXMLQLCFunctionSpeed)
         {
             loadXMLSpeed(root);
+        }
+        else if (root.name() == KXMLQLCFunctionRunOrder)
+        {
+            loadXMLRunOrder(root);
         }
         else
         {
@@ -353,6 +336,7 @@ void Audio::preRun(MasterTimer* timer)
         m_audio_out->initialize(ap.sampleRate(), ap.channels(), ap.format());
         m_audio_out->adjustIntensity(getAttributeValue(Intensity));
         m_audio_out->setFadeIn(fadeInSpeed());
+        m_audio_out->setLooped(runOrder() == Audio::Loop);
         m_audio_out->start();
         connect(m_audio_out, SIGNAL(endOfStreamReached()),
                 this, SLOT(slotEndOfStream()));
@@ -361,10 +345,29 @@ void Audio::preRun(MasterTimer* timer)
     Function::preRun(timer);
 }
 
+void Audio::setPause(bool enable)
+{
+    if (isRunning())
+    {
+        if (m_audio_out != NULL)
+        {
+            if (enable)
+                m_audio_out->suspend();
+            else
+                m_audio_out->resume();
+        }
+
+        Function::setPause(enable);
+    }
+}
+
 void Audio::write(MasterTimer* timer, QList<Universe *> universes)
 {
     Q_UNUSED(timer)
     Q_UNUSED(universes)
+
+    if (isPaused())
+        return;
 
     incrementElapsed();
 

@@ -18,6 +18,9 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Controls 2.1
+
+import "."
 
 Rectangle
 {
@@ -41,12 +44,12 @@ Rectangle
         ListElement { name: qsTr("Animation"); type: "Animation"; icon: "animation" }
         ListElement { name: qsTr("Label"); type: "Label"; icon: "label" }
         ListElement { name: qsTr("Audio Triggers"); type: "Audio Triggers"; icon: "audiotriggers" }
-        ListElement { name: qsTr("Clock"); type: "clock"; icon: "clock" }
+        ListElement { name: qsTr("Clock"); type: "Clock"; icon: "clock" }
     }
 
     ListView
     {
-        id: uniListView
+        id: widgetListView
         anchors.fill: parent
         boundsBehavior: Flickable.StopAtBounds
         model: wModel
@@ -54,30 +57,23 @@ Rectangle
             Item
             {
                 id: root
-                height: 60
+                height: UISettings.listItemHeight * 1.7
                 width: widgetsContainer.width
 
                 MouseArea
                 {
                     id: delegateRoot
                     width: widgetsContainer.width
-                    height: 60
+                    height: parent.height
 
                     drag.target: widgetItem
-                    drag.threshold: 30
+                    drag.threshold: height / 2
 
-                    onPressed:
-                    {
-                        //widgetItem.color = "#444"
-                        widgetItem.reduced = true
-                        widgetItem.x = mouse.x
-                    }
                     onReleased:
                     {
                         if (widgetItem.Drag.target !== null)
                         {
-                            // create the widget here
-                            //console.log("Item dropped on " + widgetItem.Drag.target)
+                            // emit a drop event, for the active DropArea
                             widgetItem.Drag.drop()
                         }
                         else
@@ -87,8 +83,6 @@ Rectangle
                         }
                         widgetItem.x = 3
                         widgetItem.y = 0
-                        widgetItem.reduced = false
-                        //widgetItem.color = "transparent"
                     }
                     WidgetDragItem
                     {
@@ -101,8 +95,8 @@ Rectangle
 
                         Drag.active: delegateRoot.drag.active
                         Drag.source: widgetItem
-                        Drag.hotSpot.x: 30
-                        Drag.hotSpot.y: 30
+                        Drag.hotSpot.x: height / 2
+                        Drag.hotSpot.y: height / 2
                         Drag.keys: [ "vcwidget" ]
 
                         // line divider
@@ -114,9 +108,10 @@ Rectangle
                             color: "#555"
                             visible: widgetItem.reduced ? false : true
                         }
-                    } // PluginDragItem
+                    } // WidgetDragItem
                 } // MouseArea
             } // Item
+        ScrollBar.vertical: CustomScrollBar { }
     } // ListView
 }
 

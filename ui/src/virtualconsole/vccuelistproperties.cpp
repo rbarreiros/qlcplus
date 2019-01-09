@@ -17,6 +17,8 @@
   limitations under the License.
 */
 
+#include <QAction>
+
 #include "vccuelistproperties.h"
 #include "inputselectionwidget.h"
 #include "functionselection.h"
@@ -58,16 +60,26 @@ VCCueListProperties::VCCueListProperties(VCCueList* cueList, Doc* doc)
     connect(m_chaserDetachButton, SIGNAL(clicked()), this, SLOT(slotChaserDetachClicked()));
 
     /************************************************************************
-     * Playback Cue List page
+     * Play/Stop Cue List page
      ************************************************************************/
 
     m_playInputWidget = new InputSelectionWidget(m_doc, this);
+    m_playInputWidget->setTitle(tr("Play/Pause control"));
     m_playInputWidget->setCustomFeedbackVisibility(true);
     m_playInputWidget->setKeySequence(m_cueList->playbackKeySequence());
     m_playInputWidget->setInputSource(m_cueList->inputSource(VCCueList::playbackInputSourceId));
     m_playInputWidget->setWidgetPage(m_cueList->page());
     m_playInputWidget->show();
     m_playbackLayout->addWidget(m_playInputWidget);
+
+    m_stopInputWidget = new InputSelectionWidget(m_doc, this);
+    m_stopInputWidget->setTitle(tr("Stop control"));
+    m_stopInputWidget->setCustomFeedbackVisibility(true);
+    m_stopInputWidget->setKeySequence(m_cueList->stopKeySequence());
+    m_stopInputWidget->setInputSource(m_cueList->inputSource(VCCueList::stopInputSourceId));
+    m_stopInputWidget->setWidgetPage(m_cueList->page());
+    m_stopInputWidget->show();
+    m_stopLayout->addWidget(m_stopInputWidget);
 
     /************************************************************************
      * Next Cue page
@@ -97,30 +109,27 @@ VCCueListProperties::VCCueListProperties(VCCueList* cueList, Doc* doc)
      * Crossfade Cue List page
      ************************************************************************/
 
-    if (cueList->slidersMode() == VCCueList::Steps)
-        m_sweepButton->setChecked(true);
-    else
+    if (cueList->sideFaderMode() == VCCueList::Steps)
+        m_stepsRadio->setChecked(true);
+    else if (cueList->sideFaderMode() == VCCueList::Crossfade)
         m_crossFadeRadio->setChecked(true);
 
-    m_crossfade1InputWidget = new InputSelectionWidget(m_doc, this);
-    m_crossfade1InputWidget->setTitle(tr("Left Fader"));
-    m_crossfade1InputWidget->setKeyInputVisibility(false);
-    m_crossfade1InputWidget->setInputSource(m_cueList->inputSource(VCCueList::cf1InputSourceId));
-    m_crossfade1InputWidget->setWidgetPage(m_cueList->page());
-    m_crossfade1InputWidget->show();
-    m_crossFadeLayout->addWidget(m_crossfade1InputWidget);
-    connect(m_crossfade1InputWidget, SIGNAL(autoDetectToggled(bool)),
-            this, SLOT(slotCF1AutoDetectionToggled(bool)));
+    m_crossfadeInputWidget = new InputSelectionWidget(m_doc, this);
+    m_crossfadeInputWidget->setTitle(tr("External Input"));
+    m_crossfadeInputWidget->setKeyInputVisibility(false);
+    m_crossfadeInputWidget->setInputSource(m_cueList->inputSource(VCCueList::sideFaderInputSourceId));
+    m_crossfadeInputWidget->setWidgetPage(m_cueList->page());
+    m_crossfadeInputWidget->show();
+    m_crossFadeLayout->addWidget(m_crossfadeInputWidget);
 
-    m_crossfade2InputWidget = new InputSelectionWidget(m_doc, this);
-    m_crossfade2InputWidget->setTitle(tr("Right Fader"));
-    m_crossfade2InputWidget->setKeyInputVisibility(false);
-    m_crossfade2InputWidget->setInputSource(m_cueList->inputSource(VCCueList::cf2InputSourceId));
-    m_crossfade2InputWidget->setWidgetPage(m_cueList->page());
-    m_crossfade2InputWidget->show();
-    m_crossFadeLayout->addWidget(m_crossfade2InputWidget);
-    connect(m_crossfade2InputWidget, SIGNAL(autoDetectToggled(bool)),
-            this, SLOT(slotCF2AutoDetectionToggled(bool)));
+    /* Playback layout */
+    connect(m_play_stop_pause, SIGNAL(clicked(bool)), this, SLOT(slotPlaybackLayoutChanged()));
+    connect(m_play_pause_stop, SIGNAL(clicked(bool)), this, SLOT(slotPlaybackLayoutChanged()));
+
+    if (m_cueList->playbackLayout() == VCCueList::PlayStopPause)
+        m_play_stop_pause->setChecked(true);
+    else
+        m_play_pause_stop->setChecked(true);
 }
 
 VCCueListProperties::~VCCueListProperties()
@@ -135,25 +144,34 @@ void VCCueListProperties::accept()
     /* Chaser */
     m_cueList->setChaser(m_chaserId);
 
+    /* Playback layout */
+    if (m_play_stop_pause->isChecked())
+        m_cueList->setPlaybackLayout(VCCueList::PlayStopPause);
+    else
+        m_cueList->setPlaybackLayout(VCCueList::PlayPauseStop);
+
     /* Next/Prev behavior */
-    m_cueList->setNextPrevBehavior(m_nextPrevBehaviorCombo->currentIndex());
+    m_cueList->setNextPrevBehavior(VCCueList::NextPrevBehavior(m_nextPrevBehaviorCombo->currentIndex()));
 
     /* Key sequences */
     m_cueList->setNextKeySequence(m_nextInputWidget->keySequence());
     m_cueList->setPreviousKeySequence(m_prevInputWidget->keySequence());
     m_cueList->setPlaybackKeySequence(m_playInputWidget->keySequence());
+    m_cueList->setStopKeySequence(m_stopInputWidget->keySequence());
 
     /* Input sources */
     m_cueList->setInputSource(m_nextInputWidget->inputSource(), VCCueList::nextInputSourceId);
     m_cueList->setInputSource(m_prevInputWidget->inputSource(), VCCueList::previousInputSourceId);
     m_cueList->setInputSource(m_playInputWidget->inputSource(), VCCueList::playbackInputSourceId);
-    m_cueList->setInputSource(m_crossfade1InputWidget->inputSource(), VCCueList::cf1InputSourceId);
-    m_cueList->setInputSource(m_crossfade2InputWidget->inputSource(), VCCueList::cf2InputSourceId);
+    m_cueList->setInputSource(m_stopInputWidget->inputSource(), VCCueList::stopInputSourceId);
+    m_cueList->setInputSource(m_crossfadeInputWidget->inputSource(), VCCueList::sideFaderInputSourceId);
 
-    if (m_sweepButton->isChecked())
-        m_cueList->setSlidersMode(VCCueList::Steps);
+    if (m_noneRadio->isChecked())
+        m_cueList->setSideFaderMode(VCCueList::None);
+    else if (m_stepsRadio->isChecked())
+        m_cueList->setSideFaderMode(VCCueList::Steps);
     else
-        m_cueList->setSlidersMode(VCCueList::Crossfade);
+        m_cueList->setSideFaderMode(VCCueList::Crossfade);
 
     QDialog::accept();
 }
@@ -161,23 +179,11 @@ void VCCueListProperties::accept()
 void VCCueListProperties::slotTabChanged()
 {
     m_playInputWidget->stopAutoDetection();
+    m_stopInputWidget->stopAutoDetection();
     m_nextInputWidget->stopAutoDetection();
     m_prevInputWidget->stopAutoDetection();
 
-    m_crossfade1InputWidget->stopAutoDetection();
-    m_crossfade2InputWidget->stopAutoDetection();
-}
-
-void VCCueListProperties::slotCF1AutoDetectionToggled(bool checked)
-{
-    if (checked == true && m_crossfade2InputWidget->isAutoDetecting())
-        m_crossfade2InputWidget->stopAutoDetection();
-}
-
-void VCCueListProperties::slotCF2AutoDetectionToggled(bool checked)
-{
-    if (checked == true && m_crossfade1InputWidget->isAutoDetecting())
-        m_crossfade1InputWidget->stopAutoDetection();
+    m_crossfadeInputWidget->stopAutoDetection();
 }
 
 /****************************************************************************
@@ -188,7 +194,7 @@ void VCCueListProperties::slotChaserAttachClicked()
 {
     FunctionSelection fs(this, m_doc);
     fs.setMultiSelection(false);
-    fs.setFilter(Function::Chaser, true);
+    fs.setFilter(Function::ChaserType | Function::SequenceType, true);
     if (fs.exec() == QDialog::Accepted && fs.selection().size() > 0)
     {
         m_chaserId = fs.selection().first();
@@ -200,6 +206,20 @@ void VCCueListProperties::slotChaserDetachClicked()
 {
     m_chaserId = Function::invalidId();
     updateChaserName();
+}
+
+void VCCueListProperties::slotPlaybackLayoutChanged()
+{
+    if (m_play_pause_stop->isChecked())
+    {
+        m_playInputWidget->setTitle(tr("Play/Pause control"));
+        m_stopInputWidget->setTitle(tr("Stop control"));
+    }
+    else
+    {
+        m_playInputWidget->setTitle(tr("Play/Stop control"));
+        m_stopInputWidget->setTitle(tr("Pause control"));
+    }
 }
 
 void VCCueListProperties::updateChaserName()

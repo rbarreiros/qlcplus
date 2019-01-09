@@ -27,10 +27,10 @@
 #include <QMap>
 
 #include "qlcchannel.h"
+#include "qlcfixturedef.h"
 
 class QXmlStreamReader;
 class QLCFixtureMode;
-class QLCFixtureDef;
 
 /** @addtogroup engine Engine
  * @{
@@ -92,25 +92,32 @@ private:
     QLCCapability *getCapability(QString dmx, QString name, bool isFine = false);
 
     /** Parse all channels from $elem into $fixtureDef */
-    bool parseChannel(QXmlStreamReader *doc, QLCFixtureDef* fixtureDef);
+    bool parseChannel(QXmlStreamReader *doc, QLCFixtureDef *fixtureDef);
+
+    /** Parse a Function tag defining a channel capability */
+    bool parseFunction(QXmlStreamReader *doc, QLCFixtureDef *fixtureDef,
+                       QLCChannel *channel, QString ID, QString group);
 
     /** Parse the capabilities from one channel contained in $elem into $chan (must exist) */
     bool parseAttribute(QXmlStreamReader *doc, QLCFixtureDef *fixtureDef);
 
     /** Parse a mode contained under $elem into $fixtureDef */
-    bool parseMode(QXmlStreamReader *doc, QLCFixtureDef* fixtureDef);
+    bool parseMode(QXmlStreamReader *doc, QLCFixtureDef *fixtureDef);
+
+    /** Compare global vs. mode physical to detect override */
+    bool comparePhysical(const QLCPhysical &globalPhy, const QLCPhysical &modePhy) const;
 
     /** Parse the fixture's/mode's physical properties from $elem into $mode */
-    void parsePhysical(QXmlStreamReader *doc, QLCFixtureMode* mode);
+    void parsePhysical(QXmlStreamReader *doc, QLCFixtureDef *fixtureDef, QLCFixtureMode *mode);
 
     /** Parse a mode Include tag */
-    void parseInclude(QXmlStreamReader *doc, QLCFixtureMode* mode);
+    void parseInclude(QXmlStreamReader *doc, QLCFixtureMode *mode);
 
     /** Convert string $attr into an Attributes enum */
     Attributes stringToAttributeEnum(const QString& attr);
 
     /** Attempt to guess the fixture type from the channels/capabilities in $def */
-    QString guessType(QLCFixtureDef *def) const;
+    QLCFixtureDef::FixtureType guessType(QLCFixtureDef *def) const;
 
 private:
     QString m_lastError;

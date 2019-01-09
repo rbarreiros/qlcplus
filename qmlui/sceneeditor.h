@@ -25,14 +25,14 @@
 
 class Doc;
 class Scene;
+class ListModel;
 class GenericDMXSource;
 
 class SceneEditor : public FunctionEditor
 {
     Q_OBJECT
 
-    Q_PROPERTY(QVariantList fixtures READ fixtures NOTIFY fixturesChanged)
-    Q_PROPERTY(QString sceneName READ sceneName WRITE setSceneName NOTIFY sceneNameChanged)
+    Q_PROPERTY(QVariant fixtureList READ fixtureList NOTIFY fixtureListChanged)
 
 public:
     SceneEditor(QQuickView *view, Doc *doc, QObject *parent = 0);
@@ -43,17 +43,11 @@ public:
 
     /** Return a QVariant list of references to the Fixtures
      *  involved in the Scene editing */
-    QVariantList fixtures();
-
-    /** Return the name of the currently edited Scene */
-    QString sceneName() const;
-
-    /** Set the name of the currently edited Scene */
-    void setSceneName(QString sceneName);
+    QVariant fixtureList() const;
 
     /** Enable/disable the preview of the current Scene.
      *  In this editor, the preview is done with a GenericDMXSource */
-    void setPreview(bool enable);
+    void setPreviewEnabled(bool enable);
 
     /** Method called by QML to inform the SceneEditor that
      *  SceneFixtureConsole has been loaded/unloaded. */
@@ -70,18 +64,19 @@ public:
      *  requested $fixture's $channel */
     Q_INVOKABLE double channelValue(quint32 fxID, quint32 channel);
 
-    Q_INVOKABLE void setChannelValue(quint32 fxID, quint32 channel, uchar value);
-
     Q_INVOKABLE void unsetChannel(quint32 fxID, quint32 channel);
 
     Q_INVOKABLE void setFixtureSelection(quint32 fxID);
+
+protected slots:
+    void slotSceneValueChanged(SceneValue scv);
+    void slotAliasChanged();
 
 private:
     void updateFixtureList();
 
 signals:
-    void fixturesChanged();
-    void sceneNameChanged();
+    void fixtureListChanged();
 
 private:
     /** Reference of the Scene currently being edited */
@@ -89,7 +84,7 @@ private:
     /** A list of the $m_scene Fixture IDs for fast lookup */
     QList<quint32> m_fixtureIDs;
     /** A QML-readable list of references to Fixtures used in $m_scene */
-    QVariantList m_fixtures;
+    ListModel *m_fixtureList;
     /** A reference to the SceneFixtureConsole when loaded */
     QQuickItem *m_sceneConsole;
     /** Keep a track of the registered Fixture consoles in a Scene Console,

@@ -50,7 +50,7 @@ TRANSLATIONS += ENTTEC_Wing_ja_JP.ts
 # This must be after "TARGET = " and before target installation so that
 # install_name_tool can be run before target installation
 macx {
-    include(../../../macx/nametool.pri)
+    include(../../../platforms/macos/nametool.pri)
 }
 
 # Installation
@@ -58,8 +58,7 @@ target.path = $$INSTALLROOT/$$PLUGINDIR
 INSTALLS   += target
 
 unix:!macx {
-   metainfo.path   = $$INSTALLROOT/share/appdata/
-   metainfo.files += qlcplus-enttecwing.metainfo.xml
-   INSTALLS       += metainfo 
+   metainfo.path   = $$METAINFODIR
+   metainfo.files += org.qlcplus.QLCPlus.enttecwing.metainfo.xml
+   INSTALLS       += metainfo
 }
-

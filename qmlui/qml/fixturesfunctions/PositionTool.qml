@@ -18,6 +18,7 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Layouts 1.0
 import QtQuick.Controls 1.2
 import QtQuick.Controls.Styles 1.2
 
@@ -27,8 +28,8 @@ import "."
 Rectangle
 {
     id: posToolRoot
-    width: 200
-    height: 340
+    width: UISettings.bigItemHeight * 2.2
+    height: UISettings.bigItemHeight * 3.3
     color: UISettings.bgMedium
     border.color: "#666"
     border.width: 2
@@ -42,11 +43,27 @@ Rectangle
     onPanDegreesChanged: fixtureManager.setPanValue(panDegrees)
     onTiltDegreesChanged: fixtureManager.setTiltValue(tiltDegrees)
 
+    onPanMaxDegreesChanged: gCanvas.requestPaint()
+    onTiltMaxDegreesChanged: gCanvas.requestPaint()
+
+    function tiltPositionsArray()
+    {
+        var halfTilt = tiltMaxDegrees / 2
+        var array = [ 0,
+                      halfTilt - 90,
+                      halfTilt - 45,
+                      halfTilt,
+                      halfTilt + 45,
+                      halfTilt + 90,
+                      tiltMaxDegrees ]
+        return array
+    }
+
     Rectangle
     {
         id: posToolBar
         width: parent.width
-        height: 32
+        height: UISettings.listItemHeight
         z: 10
         gradient:
             Gradient
@@ -57,12 +74,10 @@ Rectangle
 
         RobotoText
         {
-            id: titleBox
-            y: 7
-            height: 20
+            height: parent.height
             anchors.horizontalCenter: parent.horizontalCenter
             label: qsTr("Position")
-            fontSize: 15
+            fontSize: UISettings.textSizeDefault
             fontBold: true
         }
         // allow the tool to be dragged around
@@ -74,37 +89,19 @@ Rectangle
         }
     }
 
-    Rectangle
+    IconButton
     {
         id: rotateButton
-        x: parent.width - 40
-        y: 32
-        width: 40
-        height: 40
+        x: parent.width - width - 2
+        y: posToolBar.height
         z: 2
-
-        radius: 3
-        color: rotMouseArea.pressed ? UISettings.bgLight : UISettings.bgMedium
-        border.color: "#666"
-        border.width: 2
-
-        Image
+        imgSource: "qrc:/rotate-right.svg"
+        tooltip: qsTr("Rotate 90° clockwise")
+        onClicked:
         {
-            anchors.fill: parent
-            source: "qrc:/rotate-right.svg"
-            sourceSize: Qt.size(width, height)
-        }
-        MouseArea
-        {
-            id: rotMouseArea
-            anchors.fill: parent
-
-            onClicked:
-            {
-                gCanvas.rotation += 90
-                if (gCanvas.rotation == 360)
-                    gCanvas.rotation = 0
-            }
+            gCanvas.rotation += 90
+            if (gCanvas.rotation == 360)
+                gCanvas.rotation = 0
         }
     }
 
@@ -114,41 +111,41 @@ Rectangle
         width: posToolRoot.width - 20
         height: width
         x: 10
-        y: 45
+        y: posToolBar.height + 5
         rotation: 0
-
         antialiasing: true
+        contextType: "2d"
 
         onPaint:
         {
-            var ctx = gCanvas.getContext('2d');
-            //ctx.save();
-            ctx.globalAlpha = 1.0;
-            ctx.fillStyle = "#111";
-            ctx.lineWidth = 1;
+            context.globalAlpha = 1.0
+            context.fillStyle = "#111"
+            context.lineWidth = 1
 
-            ctx.fillRect(0, 0, width, height)
+            context.fillRect(0, 0, width, height)
             // draw head basement
-            DrawFuncs.drawBasement(ctx, width, height);
+            DrawFuncs.drawBasement(context, width, height)
 
-            ctx.lineWidth = 5;
+            context.lineWidth = 5
             // draw TILT curve
-            ctx.strokeStyle = "#2E77FF";
-            DrawFuncs.drawEllipse(ctx, width / 2, height / 2, 40, height - 30)
+            context.strokeStyle = "#2E77FF"
+            DrawFuncs.drawEllipse(context, width / 2, height / 2, UISettings.iconSizeDefault, height - 30)
             // draw PAN curve
-            ctx.strokeStyle = "#19438F"
-            DrawFuncs.drawEllipse(ctx, width / 2, height / 2, width - 30, 50)
+            context.strokeStyle = "#19438F"
+            DrawFuncs.drawEllipse(context, width / 2, height / 2, width - 30, UISettings.iconSizeDefault)
 
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = "white";
+            context.lineWidth = 1
+            context.strokeStyle = "white"
 
             // draw TILT cursor position
-            ctx.fillStyle = "red";
-            DrawFuncs.drawCursor(ctx, width / 2, height / 2, 40, height - 30, tiltDegrees + 135, 16)
+            context.fillStyle = "red"
+            DrawFuncs.drawCursor(context, width / 2, height / 2, UISettings.iconSizeDefault, height - 30,
+                                 tiltDegrees + 90 + (180 - tiltMaxDegrees / 2), UISettings.iconSizeMedium / 2)
 
             // draw PAN cursor position
-            ctx.fillStyle = "green";
-            DrawFuncs.drawCursor(ctx, width / 2, height / 2, width - 30, 50, panDegrees + 90, 16)
+            context.fillStyle = "green"
+            DrawFuncs.drawCursor(context, width / 2, height / 2, width - 30, UISettings.iconSizeDefault,
+                                 panDegrees + 90, UISettings.iconSizeMedium / 2)
         }
 
         MouseArea
@@ -181,31 +178,29 @@ Rectangle
                         tiltSpinBox.value--
                 }
             }
-
         }
     }
 
-    Row
+    GridLayout
     {
         x: 10
-        y: gCanvas.y + gCanvas.height + 20
+        y: gCanvas.y + gCanvas.height + 5
         width: parent.width - 20
-        height: 40
-        spacing: 5
+        columns: 4
+        rows: 2
 
+        // row 1
         RobotoText
         {
             label: "Pan"
-            width: 40
-            height: 40
         }
+
         CustomSpinBox
         {
             id: panSpinBox
-            width: 75
-            height: 40
-            minimumValue: 0
-            maximumValue: panMaxDegrees
+            Layout.fillWidth: true
+            from: 0
+            to: panMaxDegrees
             value: 0
             suffix: "°"
 
@@ -215,29 +210,46 @@ Rectangle
                 gCanvas.requestPaint()
             }
         }
-    }
 
-    Row
-    {
-        x: 10
-        y: gCanvas.y + gCanvas.height + 65
-        width: parent.width - 20
-        height: 40
-        spacing: 5
+        IconButton
+        {
+            width: UISettings.iconSizeMedium
+            height: width
+            imgSource: "qrc:/back.svg"
+            tooltip: qsTr("Snap to the previous value")
+            onClicked:
+            {
+                var prev = (parseInt(panSpinBox.value / 45) * 45) - 45
+                if (prev >= 0)
+                    panSpinBox.value = prev
+            }
+        }
+        IconButton
+        {
+            width: UISettings.iconSizeMedium
+            height: width
+            imgSource: "qrc:/forward.svg"
+            tooltip: qsTr("Snap to the next value")
+            onClicked:
+            {
+                var next = (parseInt(panSpinBox.value / 45) * 45) + 45
+                if (next <= panMaxDegrees)
+                    panSpinBox.value = next
+            }
+        }
 
+        // row 2
         RobotoText
         {
             label: "Tilt"
-            width: 40
-            height: 40
         }
+
         CustomSpinBox
         {
             id: tiltSpinBox
-            width: 75
-            height: 40
-            minimumValue: 0
-            maximumValue: tiltMaxDegrees
+            Layout.fillWidth: true
+            from: 0
+            to: tiltMaxDegrees
             value: 0
             suffix: "°"
 
@@ -245,6 +257,45 @@ Rectangle
             {
                 tiltDegrees = value
                 gCanvas.requestPaint()
+            }
+        }
+
+        IconButton
+        {
+            width: UISettings.iconSizeMedium
+            height: width
+            imgSource: "qrc:/back.svg"
+            tooltip: qsTr("Snap to the previous value")
+            onClicked:
+            {
+                var fixedPos = tiltPositionsArray()
+                for (var i = fixedPos.length - 1; i >= 0; i--)
+                {
+                    if (parseInt(fixedPos[i]) < tiltSpinBox.value)
+                    {
+                        tiltSpinBox.value = parseInt(fixedPos[i])
+                        break;
+                    }
+                }
+            }
+        }
+        IconButton
+        {
+            width: UISettings.iconSizeMedium
+            height: width
+            imgSource: "qrc:/forward.svg"
+            tooltip: qsTr("Snap to the next value")
+            onClicked:
+            {
+                var fixedPos = tiltPositionsArray()
+                for (var i = 0; i < fixedPos.length; i++)
+                {
+                    if (tiltSpinBox.value < parseInt(fixedPos[i]))
+                    {
+                        tiltSpinBox.value = parseInt(fixedPos[i])
+                        break;
+                    }
+                }
             }
         }
     }

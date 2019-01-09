@@ -70,7 +70,7 @@ public slots:
     void slotFunctionManagerActive(bool active);
 
     /** Listens to fixture values changes to be applied to the selected step */
-    void slotUpdateCurrentStep(SceneValue sv);
+    void slotUpdateCurrentStep(SceneValue sv, bool enabled);
 
 private slots:
     void slotNameEdited(const QString& text);
@@ -87,6 +87,7 @@ private slots:
     void slotRemoveClicked();
     void slotRaiseClicked();
     void slotLowerClicked();
+    void slotShuffleClicked();
     void slotSpeedDialToggle(bool state);
     void slotItemSelectionChanged();
     void slotItemChanged(QTreeWidgetItem*,int);

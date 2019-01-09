@@ -27,6 +27,7 @@
 #include <QMutex>
 #include <QList>
 #include <QIcon>
+#include <QMap>
 
 #include "universe.h"
 #include "functionparent.h"
@@ -50,6 +51,7 @@ class FunctionUiState;
 #define KXMLQLCFunctionType "Type"
 #define KXMLQLCFunctionData "Data"
 #define KXMLQLCFunctionPath "Path"
+#define KXMLQLCFunctionHidden "Hidden"
 #define KXMLQLCFunctionBlendMode "BlendMode"
 
 #define KXMLQLCFunctionValue "Value"
@@ -72,9 +74,20 @@ class FunctionUiState;
 
 typedef struct
 {
-    QString name;
-    qreal value;
+    QString m_name;
+    qreal m_value;
+    qreal m_min;
+    qreal m_max;
+    int m_flags;
+    bool m_isOverridden;
+    qreal m_overrideValue;
 } Attribute;
+
+typedef struct
+{
+    int m_attrIndex;
+    qreal m_value;
+} AttributeOverride;
 
 class Function : public QObject
 {
@@ -93,28 +106,37 @@ public:
      */
     enum Type
     {
-        Undefined  = 0,
-        Scene      = 1 << 0,
-        Chaser     = 1 << 1,
-        EFX        = 1 << 2,
-        Collection = 1 << 3,
-        Script     = 1 << 4,
-        RGBMatrix  = 1 << 5,
-        Show       = 1 << 6,
-        Audio      = 1 << 7
+        Undefined      = 0,
+        SceneType      = 1 << 0,
+        ChaserType     = 1 << 1,
+        EFXType        = 1 << 2,
+        CollectionType = 1 << 3,
+        ScriptType     = 1 << 4,
+        RGBMatrixType  = 1 << 5,
+        ShowType       = 1 << 6,
+        SequenceType   = 1 << 7,
+        AudioType      = 1 << 8
 #if QT_VERSION >= 0x050000
-        , Video    = 1 << 8
+        , VideoType    = 1 << 9
 #endif
     };
-    Q_ENUMS(Type)
+#if QT_VERSION >= 0x050500
+    Q_ENUM(Type)
+#endif
 
     /**
      * Common attributes
      */
     enum Attr
     {
-        Intensity = 0,
+        Intensity = 0
     };
+
+public:
+    enum PropType { Name = 0, FadeIn, Hold, FadeOut, Duration, Notes };
+#if QT_VERSION >= 0x050500
+    Q_ENUM(PropType)
+#endif
 
     /*********************************************************************
      * Initialization
@@ -242,14 +264,11 @@ public:
      */
     static Type stringToType(const QString& str);
 
-    /**
-     * Convert a type to an icon
-     *
-     * @param type The type to convert
-     */
-    static QIcon typeToIcon(Function::Type type);
+    /** Virtual method to retrieve a QIcon based on a Function type.
+      * Subclasses should reimplement this */
+    virtual QIcon getIcon() const;
 
-private:
+protected:
     Type m_type;
 
     /*********************************************************************
@@ -266,6 +285,19 @@ private:
     QString m_path;
 
     /*********************************************************************
+     * Visibility
+     *********************************************************************/
+public:
+    /** Set the function visibility status. Hidden Functions will not be displayed in the UI */
+    void setVisible(bool visible);
+
+    /** Retrieve the current visibility status */
+    bool isVisible() const;
+
+private:
+    bool m_visible;
+
+    /*********************************************************************
      * Common XML
      *********************************************************************/
 protected:
@@ -277,7 +309,9 @@ protected:
      *********************************************************************/
 public:
     enum RunOrder { Loop = 0, SingleShot, PingPong, Random };
-    Q_ENUMS(RunOrder)
+#if QT_VERSION >= 0x050500
+    Q_ENUM(RunOrder)
+#endif
 
 public:
     /**
@@ -321,7 +355,9 @@ private:
      *********************************************************************/
 public:
     enum Direction { Forward = 0, Backward };
-    Q_ENUMS(Direction)
+#if QT_VERSION >= 0x050500
+    Q_ENUM(Direction)
+#endif
 
 public:
     /**
@@ -359,6 +395,71 @@ protected:
 
 private:
     Direction m_direction;
+
+    /*********************************************************************
+     * Tempo type
+     *********************************************************************/
+public:
+    enum TempoType { Original = -1, Time = 0, Beats = 1 };
+    enum FractionsType { NoFractions = 0, ByTwoFractions, AllFractions };
+#if QT_VERSION >= 0x050500
+    Q_ENUM(TempoType)
+    Q_ENUM(FractionsType)
+#endif
+
+public:
+    /**
+     * Set the speed type of this function.
+     * When switching from a type to another, the current fade in, hold, fade out
+     * and duration times will be converted to the new type.
+     *
+     * @param type the speed type
+     */
+    void setTempoType(const Function::TempoType& type);
+
+    /**
+     * Get the Function current speed type
+     */
+    Function::TempoType tempoType() const;
+
+    /**
+     * Convert a tempo type to a string
+     *
+     * @param type Tempo type to convert
+     */
+    static QString tempoTypeToString(const Function::TempoType& type);
+
+    /**
+     * Convert a string to a tempo type
+     *
+     * @param str The string to convert
+     */
+    static Function::TempoType stringToTempoType(const QString& str);
+
+    /** Convert a time value in milliseconds to a beat value */
+    static uint timeToBeats(uint time, int beatDuration);
+
+    /** Convert a beat value to a time value in milliseconds */
+    static uint beatsToTime(uint beats, int beatDuration);
+
+    /** Get the override speed type (done by a Chaser) */
+    TempoType overrideTempoType() const;
+
+    /** Set the override speed type (done by a Chaser) */
+    void setOverrideTempoType(TempoType type);
+
+protected slots:
+    /**
+     * This slot is connected to the Master Timer and it is invoked
+     * when this Function is in 'Beats' tempo type and the BPM
+     * number changed. Subclasses should reimplement this.
+     */
+    virtual void slotBPMChanged(int bpmNumber);
+
+private:
+    TempoType m_tempoType;
+    TempoType m_overrideTempoType;
+    bool m_beatResyncNeeded;
 
     /*********************************************************************
      * Speed
@@ -425,7 +526,7 @@ public:
     /** Safe speed operations */
     static uint speedNormalize(uint speed);
     static uint speedAdd(uint left, uint right);
-    static uint speedSubstract(uint left, uint right);
+    static uint speedSubtract(uint left, uint right);
 
 signals:
     void totalDurationChanged();
@@ -450,14 +551,18 @@ private:
      * UI State
      *********************************************************************/
 public:
-    FunctionUiState * uiState();
-    const FunctionUiState * uiState() const;
+    /** Get/Set a generic UI property specific to this Function */
+    QVariant uiStateValue(QString property);
+    void setUiStateValue(QString property, QVariant value);
+
+    /** Get the whole UI state map */
+    QMap<QString, QVariant> uiStateMap() const;
 
 private:
-    virtual FunctionUiState * createUiState();
-
-private:
-    FunctionUiState * m_uiState;
+    /** A generic map to temporary store key/value
+     *  pairs that the UI can use to remember how an editor
+     *  was configured. Note: this is not saved into XML */
+    QMap<QString, QVariant> m_uiState;
 
     /*********************************************************************
      * Fixtures
@@ -501,6 +606,18 @@ public:
      * implementation does nothing.
      */
     virtual void postLoad();
+
+    /**
+     * Check if a Function ID is included/controlled by this Function.
+     * Subclasses should reimplement this.
+     */
+    virtual bool contains(quint32 functionId);
+
+    /**
+     * Return a list of components such as Functions/Fixtures with unique IDs.
+     * Subclasses should reimplement this.
+     */
+    virtual QList<quint32> components();
 
     /*********************************************************************
      * Flash
@@ -576,6 +693,12 @@ public:
      */
     virtual void postRun(MasterTimer* timer, QList<Universe*> universes);
 
+protected:
+    /** Helper method to dismiss all the faders previously added to
+     *  m_fadersMap. This is usually called on Function postRun when
+     *  no fade out is requested */
+    virtual void dismissAllFaders();
+
 signals:
     /**
      * Emitted when a function is started (i.e. added to MasterTimer's
@@ -593,6 +716,10 @@ signals:
      */
     void stopped(quint32 id);
 
+protected:
+    /** Map used to lookup a GenericFader instance for a Universe ID */
+    QMap<quint32, GenericFader *> m_fadersMap;
+
     /*********************************************************************
      * Elapsed
      *********************************************************************/
@@ -605,6 +732,8 @@ public:
      */
     quint32 elapsed() const;
 
+    quint32 elapsedBeats() const;
+
 protected:
     /** Reset elapsed timer ticks to zero */
     void resetElapsed();
@@ -612,10 +741,16 @@ protected:
     /** Increment the elapsed timer ticks by one */
     void incrementElapsed();
 
+    /** Increment the elapsed beats by one */
+    void incrementElapsedBeats();
+
     void roundElapsed(quint32 roundTime);
 
 private:
+    /* The elapsed time in ms when tempoType is Time */
     quint32 m_elapsed;
+    /* The elapsed beats when tempoType is Beats */
+    quint32 m_elapsedBeats;
 
     /*********************************************************************
      * Start & Stop
@@ -629,11 +764,23 @@ public:
      * @param overrideFadeIn Override the function's default fade in speed
      * @param overrideFadeOut Override the function's default fade out speed
      * @param overrideDuration Override the function's default duration
+     * @param overrideTempoType Override the tempo type of the function
      */
     void start(MasterTimer* timer, FunctionParent parent, quint32 startTime = 0,
                uint overrideFadeIn = defaultSpeed(),
                uint overrideFadeOut = defaultSpeed(),
-               uint overrideDuration = defaultSpeed());
+               uint overrideDuration = defaultSpeed(),
+               TempoType overrideTempoType = Original);
+
+    /**
+     * Pause a running Function. Subclasses should check the paused state
+     * immediately in the write call and, in case, return, to avoid performing
+     * any action and moreover to increment the elapsed time.
+     * This is declared as virtual for those subclasses where the actual
+     * Function progress is handled in a separate thread, like multimedia
+     * functions, or where the Function handles a few children Functions.
+     */
+    virtual void setPause(bool enable);
 
     /**
      * Mark the function to be stopped ASAP. MasterTimer will stop running
@@ -641,7 +788,7 @@ public:
      * There is no way to cancel it, but the function can be started again
      * normally.
      */
-    void stop(FunctionParent parent);
+    void stop(FunctionParent parent, bool preserveAttributes = false);
 
     /**
      * Check, whether the function should be stopped ASAP. Functions can use this
@@ -668,12 +815,25 @@ public:
      */
     bool isRunning() const;
 
+    /**
+     * Check if the function is currently in a paused state. This is invoked
+     * by subclasses to understand if they have to do something during the
+     * write call
+     */
+    bool isPaused() const;
+
     bool startedAsChild() const;
 
 private:
-    /** Stop flag, private to keep functions from modifying it. */
+    /** Running state flags. The rules are:
+     *  - m_stop resets also m_paused
+     *  - m_paused and m_running can be both true
+     *  - if m_paused is true, a start(...) call will just reset it to false
+     *  These are private to prevent Functions from modifying them. */
     bool m_stop;
     bool m_running;
+    bool m_paused;
+
     QList<FunctionParent> m_sources;
     QMutex m_sourcesMutex;
 
@@ -684,14 +844,44 @@ private:
      * Attributes
      *************************************************************************/
 public:
+    enum OverrideFlags
+    {
+        Multiply = (1 << 0), /** The original attribute value should be multiplied by the overridden values */
+        LastWins = (1 << 1), /** The original attribute value is overridden by the last requested override value */
+        Single   = (1 << 2)  /** Only one attribute override ID will be allowed */
+    };
+
+    static int invalidAttributeId();
+
     /**
      * Register a new attribute for this function.
      * If the attribute already exists, it will be overwritten.
      *
      * @param name The attribute name
+     * @param min The attribute minimum value
+     * @param max The attribute maximum value
      * @param value The attribute initial value
      */
-    int registerAttribute(QString name, qreal value = 1.0);
+    int registerAttribute(QString name, int flags = Multiply, qreal min = 0.0, qreal max = 1.0, qreal value = 1.0);
+
+    /**
+     * Request a new attribute override ID. A Function will always return a new ID,
+     * that the caller can use in the adjustAttribute method.
+     *
+     * @param attributeIndex the attribute index that will be overridden by the caller
+     * @param value an initial override value
+     *
+     * @return an override ID to be used to adjust the overridden value,
+     *         or -1 if the specified $attributeIndex is not valid
+     */
+    int requestAttributeOverride(int attributeIndex, qreal value = 1.0);
+
+    /**
+     * Release an attribute override no longer needed
+     *
+     * @param attributeId and ID previously acquired with requestAttributeOverride
+     */
+    void releaseAttributeOverride(int attributeId);
 
     /**
      * Unregister a previously created attribute for this function.
@@ -702,7 +892,7 @@ public:
     bool unregisterAttribute(QString name);
 
     /**
-     * Rename an existing atribute
+     * Rename an existing attribute
      *
      * @param idx the attribute index
      * @param newName the new name for the attribute
@@ -711,14 +901,25 @@ public:
     bool renameAttribute(int idx, QString newName);
 
     /**
-     * Adjust the intensity of the function by a fraction.
+     * Adjust an attribute value with the given new $value.
+     * If $attributeId is within the registered attributes range,
+     * the oiginal attribute value will be changed.
+     * Warning: only Function editors or the Function itself should do this !
+     * Otherwise, if $attributeId is >= OVERRIDE_ATTRIBUTE_START_ID
+     * it means the caller wants to control a value override.
+     * This operation will then recalculate the final override value
+     * according to the original attribute flags
      *
-     * @param fraction Intensity as a fraction (0.0 - 1.0)
+     * @param value the new attribute value
+     * @param attributeId the ID of the attribute to control
+     *
+     * @return the original attribute index or -1 on error
      */
-    virtual void adjustAttribute(qreal fraction, int attributeIndex);
+    virtual int adjustAttribute(qreal value, int attributeId);
 
     /**
-     * Reset intensity to the default value (1.0).
+     * Reset the overridden attributes, while keeping
+     * the original attribute values unchanged
      */
     void resetAttributes();
 
@@ -739,21 +940,37 @@ public:
     int getAttributeIndex(QString name) const;
 
     /**
-     * Get the function's attributes
+     * Get a list of the registered function's attributes
      *
      * @return a list of Attributes
      */
-    QList <Attribute> attributes();
+    QList <Attribute> attributes() const;
+
+protected:
+    /**
+     * Mark an attribute with the given $attributeIndex as overridden, and
+     * calculates the final override value according to the registered attribute flags
+     *
+     * @param attributeIndex the attribute index
+     */
+    void calculateOverrideValue(int attributeIndex);
 
 signals:
-    /** Informs that an attribute of the function has changed */
+    /** Notify the listeners that an attribute has changed */
     void attributeChanged(int index, qreal fraction);
 
 private:
+    /** A list of the registered attributes */
     QList <Attribute> m_attributes;
 
-public:
-    virtual bool contains(quint32 functionId);
+    /** A map of the overridden attributes */
+    QMap <int, AttributeOverride> m_overrideMap;
+
+    /** Last assigned override ID */
+    int m_lastOverrideAttributeId;
+
+    /** Flag to preserve or discard attributes on stop calls */
+    bool m_preserveAttributes;
 
     /*************************************************************************
      * Blend mode

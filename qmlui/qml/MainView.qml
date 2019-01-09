@@ -19,11 +19,10 @@
 
 import QtQuick 2.2
 import QtQuick.Layouts 1.1
-import QtQuick.Controls 1.2
+import QtQuick.Controls 2.1
 
+import org.qlcplus.classes 1.0
 import "."
-
-import "DetachWindow.js" as WinLoader
 
 Rectangle
 {
@@ -32,8 +31,12 @@ Rectangle
     width: 800
     height: 600
     anchors.fill: parent
+    color: UISettings.bgMain
 
     property string currentContext: "FIXANDFUNC"
+
+    Component.onCompleted: UISettings.sidePanelWidth = Math.min(width / 3, UISettings.bigItemHeight * 5)
+    onWidthChanged: UISettings.sidePanelWidth = Math.min(width / 3, UISettings.bigItemHeight * 5)
 
     function enableContext(ctx, setChecked)
     {
@@ -65,7 +68,25 @@ Rectangle
 
         enableContext(ctx, true)
         currentContext = ctx
-        mainViewLoader.source = qmlRes
+        if (qmlRes)
+            mainViewLoader.source = qmlRes
+    }
+
+    function setDimScreen(enable)
+    {
+        dimScreen.visible = enable
+    }
+
+    function openAccessRequest(clientName)
+    {
+        clientAccessPopup.clientName = clientName
+        clientAccessPopup.open()
+    }
+
+    function saveBeforeExit()
+    {
+        //actionsMenu.open()
+        actionsMenu.saveBeforeExit()
     }
 
     FontLoader
@@ -82,6 +103,7 @@ Rectangle
     Rectangle
     {
         id: mainToolbar
+        visible: qlcplus.accessMask !== App.AC_VCControl
         width: parent.width
         height: UISettings.iconSizeDefault
         z: 50
@@ -96,27 +118,35 @@ Rectangle
             spacing: 5
             anchors.fill: parent
 
-            ExclusiveGroup { id: menuBarGroup }
+            ButtonGroup { id: menuBarGroup }
+
             MenuBarEntry
             {
                 id: actEntry
-                imgSource: "qrc:/qlcplus.png"
+                imgSource: "qrc:/qlcplus.svg"
                 entryText: qsTr("Actions")
-                onClicked:
+                onPressed: actionsMenu.open()
+                autoExclusive: false
+                checkable: false
+
+                Image
                 {
-                    actionsMenu.visible = true
-                    contextMenuArea.enabled = true
-                    contextMenuArea.z = 98
+                    visible: qlcplus.docModified
+                    source: "qrc:/filesave.svg"
+                    x: 1
+                    y: parent.height - height - 1
+                    height: parent.height / 3
+                    width: height
+                    sourceSize: Qt.size(width, height)
                 }
             }
             MenuBarEntry
             {
                 id: edEntry
-                imgSource: "editor.svg"
+                imgSource: "qrc:/editor.svg"
                 entryText: qsTr("Fixtures & Functions")
-                checkable: true
                 checked: true
-                exclusiveGroup: menuBarGroup
+                ButtonGroup.group: menuBarGroup
                 onCheckedChanged:
                 {
                     if (checked == true)
@@ -126,10 +156,10 @@ Rectangle
             MenuBarEntry
             {
                 id: vcEntry
-                imgSource: "virtualconsole.svg"
+                visible: qlcplus.accessMask & App.AC_VCControl
+                imgSource: "qrc:/virtualconsole.svg"
                 entryText: qsTr("Virtual Console")
-                checkable: true
-                exclusiveGroup: menuBarGroup
+                ButtonGroup.group: menuBarGroup
                 onCheckedChanged:
                 {
                     if (checked == true)
@@ -138,16 +168,16 @@ Rectangle
                 onRightClicked:
                 {
                     vcEntry.visible = false
-                    WinLoader.createWindow("qrc:/VirtualConsole.qml")
+                    contextManager.detachContext("VC")
                 }
             }
             MenuBarEntry
             {
                 id: sdEntry
-                imgSource: "simpledesk.svg"
+                visible: qlcplus.accessMask & App.AC_SimpleDesk
+                imgSource: "qrc:/simpledesk.svg"
                 entryText: qsTr("Simple Desk")
-                checkable: true
-                exclusiveGroup: menuBarGroup
+                ButtonGroup.group: menuBarGroup
                 onCheckedChanged:
                 {
                     if (checked == true)
@@ -156,16 +186,16 @@ Rectangle
                 onRightClicked:
                 {
                     sdEntry.visible = false
-                    WinLoader.createWindow("qrc:/SimpleDesk.qml")
+                    contextManager.detachContext("SDESK")
                 }
             }
             MenuBarEntry
             {
                 id: smEntry
-                imgSource: "showmanager.svg"
+                visible: qlcplus.accessMask & App.AC_ShowManager
+                imgSource: "qrc:/showmanager.svg"
                 entryText: qsTr("Show Manager")
-                checkable: true
-                exclusiveGroup: menuBarGroup
+                ButtonGroup.group: menuBarGroup
                 onCheckedChanged:
                 {
                     if (checked == true)
@@ -174,16 +204,16 @@ Rectangle
                 onRightClicked:
                 {
                     smEntry.visible = false
-                    WinLoader.createWindow("qrc:/ShowManager.qml")
+                    contextManager.detachContext("SHOWMGR")
                 }
             }
             MenuBarEntry
             {
                 id: ioEntry
-                imgSource: "inputoutput.svg"
+                visible: qlcplus.accessMask & App.AC_InputOutput
+                imgSource: "qrc:/inputoutput.svg"
                 entryText: qsTr("Input/Output")
-                checkable: true
-                exclusiveGroup: menuBarGroup
+                ButtonGroup.group: menuBarGroup
                 onCheckedChanged:
                 {
                     if (checked == true)
@@ -192,58 +222,101 @@ Rectangle
                 onRightClicked:
                 {
                     ioEntry.visible = false
-                    WinLoader.createWindow("qrc:/InputOutputManager.qml")
+                    contextManager.detachContext("IOMGR")
                 }
             }
             Rectangle
             {
                 // acts like an horizontal spacer
                 Layout.fillWidth: true
+                height: parent.height
+                color: "transparent"
             }
-        }
+            RobotoText
+            {
+                label: "BPM: " + (ioManager.bpmNumber > 0 ? ioManager.bpmNumber : qsTr("Off"))
+                color: gsMouseArea.containsMouse ? UISettings.bgLight : "transparent"
+                fontSize: UISettings.textSizeDefault
+
+                MouseArea
+                {
+                    id: gsMouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: beatSelectionPanel.visible = !beatSelectionPanel.visible
+                }
+                BeatGeneratorsPanel
+                {
+                    id: beatSelectionPanel
+                    parent: mainView
+                    y: mainToolbar.height
+                    x: beatIndicator.x - width
+                    z: 51
+                    visible: false
+                }
+            }
+            Rectangle
+            {
+                id: beatIndicator
+                width: height
+                height: parent.height * 0.5
+                radius: height / 2
+                border.width: 2
+                border.color: "#333"
+                color: "#666"
+
+                ColorAnimation on color
+                {
+                    id: cAnim
+                    from: "#00FF00"
+                    to: "#666"
+                    // half the duration of the current BPM
+                    duration: ioManager.bpmNumber ? 30000 / ioManager.bpmNumber : 200
+                    running: false
+                }
+
+                Connections
+                {
+                    id: beatSignal
+                    target: ioManager
+                    onBeat: cAnim.restart()
+                }
+            }
+
+        } // end of RowLayout
+    } // end of mainToolbar
+
+    Loader
+    {
+        id: mainViewLoader
+        width: parent.width
+        height: parent.height - (mainToolbar.visible ? mainToolbar.height : 0)
+        y: mainToolbar.visible ? mainToolbar.height : 0
+        source: "qrc:/FixturesAndFunctions.qml"
     }
+
+    PopupNetworkConnect { id: clientAccessPopup }
 
     /** Menu to open/load/save a project */
     ActionsMenu
     {
         id: actionsMenu
+        x: 1
+        y: actEntry.height + 1
+        visible: false
+        z: visible ? 99 : 0
     }
 
-    /** Mouse area enabled when actionsMenu is visible
-     *  It fills the whole application window to grab
-     *  a click outside the menu and close it
-     */
-    MouseArea
-    {
-        id: contextMenuArea
-        z: 0
-        enabled: false
-        anchors.fill: parent
-        onClicked:
-        {
-            console.log("Root clicked")
-            if (actionsMenu.visible == true)
-            {
-                contextMenuArea.enabled = false
-                contextMenuArea.z = 0;
-                actionsMenu.visible = false
-            }
-        }
-    }
-
+    /* Rectangle covering the whole window to
+     * have a dimmered background for popups */
     Rectangle
     {
-        id: mainViewArea
-        width: parent.width
-        height: parent.height - mainToolbar.height
-        y: mainToolbar.height
-        color: UISettings.bgMain
-
-        Loader
-        {
-            id: mainViewLoader
-            anchors.fill: parent
-            source: "qrc:/FixturesAndFunctions.qml"
-        }
+        id: dimScreen
+        anchors.fill: parent
+        visible: false
+        z: 99
+        color: Qt.rgba(0, 0, 0, 0.5)
     }
+
+    PopupDisclaimer { }
 }

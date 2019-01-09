@@ -22,7 +22,9 @@
 #define UNIVERSE_H
 
 #include <QScopedPointer>
+#include <QSemaphore>
 #include <QByteArray>
+#include <QThread>
 #include <QSet>
 
 #include "qlcchannel.h"
@@ -31,10 +33,12 @@ class QXmlStreamReader;
 class QLCInputProfile;
 class ChannelModifier;
 class InputOutputMap;
+class GenericFader;
 class QLCIOPlugin;
 class GrandMaster;
 class OutputPatch;
 class InputPatch;
+class Doc;
 
 /** @addtogroup engine Engine
  * @{
@@ -48,35 +52,31 @@ class InputPatch;
 #define KXMLQLCUniversePassthrough "Passthrough"
 
 #define KXMLQLCUniverseInputPatch "Input"
-#define KXMLQLCUniverseInputPlugin "Plugin"
-#define KXMLQLCUniverseInputLine "Line"
-#define KXMLQLCUniverseInputProfileName "Profile"
-
 #define KXMLQLCUniverseOutputPatch "Output"
-#define KXMLQLCUniverseOutputPlugin "Plugin"
-#define KXMLQLCUniverseOutputLine "Line"
-
 #define KXMLQLCUniverseFeedbackPatch "Feedback"
-#define KXMLQLCUniverseFeedbackPlugin "Plugin"
-#define KXMLQLCUniverseFeedbackLine "Line"
 
+#define KXMLQLCUniversePlugin "Plugin"
+#define KXMLQLCUniverseLine "Line"
+#define KXMLQLCUniverseProfileName "Profile"
 #define KXMLQLCUniversePluginParameters "PluginParameters"
 
 /** Universe class contains input/output data for one DMX universe
  */
-class Universe: public QObject
+class Universe: public QThread
 {
     Q_OBJECT
     Q_DISABLE_COPY(Universe)
 
-    Q_PROPERTY(QString name READ name NOTIFY nameChanged)
+    Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
     Q_PROPERTY(quint32 id READ id CONSTANT)
-    Q_PROPERTY(InputPatch* inputPatch READ inputPatch NOTIFY inputPatchChanged)
-    Q_PROPERTY(OutputPatch* outputPatch READ outputPatch NOTIFY outputPatchChanged)
+    Q_PROPERTY(bool passthrough READ passthrough WRITE setPassthrough NOTIFY passthroughChanged)
+    Q_PROPERTY(InputPatch *inputPatch READ inputPatch NOTIFY inputPatchChanged)
+    Q_PROPERTY(int outputPatchesCount READ outputPatchesCount NOTIFY outputPatchesCountChanged)
+    Q_PROPERTY(bool hasFeedbacks READ hasFeedbacks NOTIFY hasFeedbacksChanged)
 
 public:
     /** Construct a new Universe */
-    Universe(quint32 id = invalid(), GrandMaster *gm = NULL, QObject* parent = 0);
+    Universe(quint32 id = invalid(), GrandMaster *gm = NULL, QObject *parent = 0);
 
     /** Destructor */
     virtual ~Universe();
@@ -150,6 +150,8 @@ public:
      */
     bool monitor() const;
 
+    uchar applyPassthrough(int channel, uchar value);
+
 protected slots:
     /**
      * Called every time the Grand Master changed value
@@ -169,11 +171,11 @@ protected:
 
     uchar applyRelative(int channel, uchar value);
     uchar applyModifiers(int channel, uchar value);
-    uchar applyPassthrough(int channel, uchar value);
     void updatePostGMValue(int channel);
 
 signals:
     void nameChanged();
+    void passthroughChanged();
 
 protected:
     /** The universe ID */
@@ -195,35 +197,55 @@ public:
      *  otherwise returns false */
     bool isPatched();
 
+    /** Sets an input patch for this Universe, and connect to it to receive signals */
     bool setInputPatch(QLCIOPlugin *plugin, quint32 input,
                        QLCInputProfile *profile = NULL);
 
-    bool setOutputPatch(QLCIOPlugin *plugin, quint32 output);
+    /** Add/Remove/Replace an output patch on this Universe */
+    bool setOutputPatch(QLCIOPlugin *plugin, quint32 output, int index = 0);
 
+    /** Sets a feedback patch for this Universe */
     bool setFeedbackPatch(QLCIOPlugin *plugin, quint32 output);
+
+    /** Flag that indicates if this Universe has a patched feedback line */
+    bool hasFeedbacks() const;
 
     /**
      * Get the reference to the input plugin associated to this universe.
      * If not present NULL is returned.
      */
-    InputPatch* inputPatch() const;
+    InputPatch *inputPatch() const;
 
     /**
      * Get the reference to the output plugin associated to this universe.
      * If not present NULL is returned.
      */
-    OutputPatch* outputPatch() const;
+    Q_INVOKABLE OutputPatch *outputPatch(int index = 0) const;
+
+    /** Return the number of output patches associated to this Universe */
+    int outputPatchesCount() const;
 
     /**
      * Get the reference to the feedback plugin associated to this universe.
      * If not present NULL is returned.
      */
-    OutputPatch* feedbackPatch() const;
+    OutputPatch *feedbackPatch() const;
 
     /**
      * This is the actual function that writes data to an output patch
      */
     void dumpOutput(const QByteArray& data);
+
+    /**
+     * @brief dumpBlackout
+     */
+    void dumpBlackout();
+
+    /**
+     * @brief blackoutData
+     * @return
+     */
+    const QByteArray& blackoutData();
 
     void flushInput();
 
@@ -238,18 +260,24 @@ signals:
     /** Notify the listeners that the input patch has changed */
     void inputPatchChanged();
 
-    /** Notify the listeners that the output patch has changed */
+    /** Notify the listeners that one output patch has changed */
     void outputPatchChanged();
+
+    /** Notify the listeners that the number of output patches has changed */
+    void outputPatchesCountChanged();
+
+    /** Notify the listeners that a feedback line has been patched/unpatched */
+    void hasFeedbacksChanged();
 
 private:
     /** Reference to the input patch associated to this universe. */
-    InputPatch* m_inputPatch;
+    InputPatch *m_inputPatch;
 
-    /** Reference to the output patch associated to this universe. */
-    OutputPatch* m_outputPatch;
+    /** List of references to the output patches associated to this universe. */
+    QList<OutputPatch*>m_outputPatchList;
 
     /** Reference to the feedback patch associated to this universe. */
-    OutputPatch* m_fbPatch;
+    OutputPatch *m_fbPatch;
 
 private:
     // Connect to inputPatch's valueChanged signal
@@ -276,6 +304,14 @@ public:
      */
     uchar channelCapabilities(ushort channel);
 
+    /**
+     * Set the default value of a DMX channel to be considered on reset
+     *
+     * @param channel The channel absolute index in the universe
+     * @param value the default DMX value
+     */
+    void setChannelDefaultValue(ushort channel, uchar value);
+
     /** Assign a Channel Modifier to the given channel index
       * $modifier can be NULL if the channel has no modifier */
     void setChannelModifier(ushort channel, ChannelModifier *modifier);
@@ -291,9 +327,55 @@ protected:
     /** Vector of pointer to ChannelModifier classes. If not NULL, they will modify
      *  a DMX value right before HTP/LTP check and before being assigned to preGM */
     QVector<ChannelModifier*> m_modifiers;
+
     /** Modified channels with the non-modified value at 0.
      *  This is used for ranged initialization operations. */
     QScopedPointer<QByteArray> m_modifiedZeroValues;
+
+    /************************************************************************
+     * Faders
+     ************************************************************************/
+public:
+    enum FaderPriority
+    {
+        Auto = 0,
+        Override,
+        SimpleDesk
+    };
+
+    /** Request a new GenericFader used to compose the final values of
+     *  this Universe. The caller is in charge of adding/removing
+     *  FadeChannels and eventually dismiss a fader when no longer needed.
+     *  If a fade out transition is needed, this Universe
+     *  is in charge of completing it and dismissing the fader. */
+    GenericFader *requestFader(FaderPriority priority = Auto);
+
+    /** Dismiss a fader requested with requestFader, which is no longer needed */
+    void dismissFader(GenericFader *fader);
+
+    void requestFaderPriority(GenericFader *fader, FaderPriority priority);
+
+public slots:
+    void tick();
+
+protected:
+    void processFaders();
+
+    /** DMX writer thread worker method */
+    void run();
+
+signals:
+    void universeWritten(quint32 universeID, const QByteArray& universeData);
+
+protected:
+    QSemaphore m_semaphore;
+
+    /** Indicated if the DMX writer worker thread is running */
+    bool m_running;
+
+    /** IMPORTANT: this is the list of faders that will compose
+     *  the Universe values. The order is very important ! */
+    QList<GenericFader *> m_faders;
 
     /************************************************************************
      * Values
@@ -328,7 +410,7 @@ public:
      *
      * @return The current values
      */
-    const QByteArray* postGMValues() const;
+    const QByteArray *postGMValues() const;
 
     /**
      * Get the current pre-Grand-Master values (used by functions and everyone
@@ -351,7 +433,7 @@ public:
     /** Set all intensity channel values to zero */
     void zeroIntensityChannels();
 
-    /** Return a list with intesity channels and their values */
+    /** Return a list with intensity channels and their values */
     QHash <int, uchar> intensityChannels();
 
     /** Set all channel relative values to zero */
@@ -477,7 +559,7 @@ public:
      * @param root An XML subtree containing the universe contents
      * @return true if the Universe was loaded successfully, otherwise false
      */
-    bool loadXML(QXmlStreamReader &root, int index, InputOutputMap* ioMap);
+    bool loadXML(QXmlStreamReader &root, int index, InputOutputMap *ioMap);
 
     /**
      * Load an optional tag defining the plugin specific parameters
@@ -495,6 +577,23 @@ public:
      * @param wksp_root The workspace root element
      */
     bool saveXML(QXmlStreamWriter *doc) const;
+
+    /**
+     * Save one patch (input/output/feedback)
+     *
+     * @param doc
+     * @param tag
+     * @param pluginName
+     * @param line
+     * @param profileName
+     * @param parameters
+     */
+    void savePatchXML(QXmlStreamWriter *doc,
+        QString const & tag,
+        QString const & pluginName,
+        quint32 line,
+        QString profileName,
+        QMap<QString, QVariant>parameters) const;
 
     /**
      * Save a plugin custom parameters (if available) into a tag nested

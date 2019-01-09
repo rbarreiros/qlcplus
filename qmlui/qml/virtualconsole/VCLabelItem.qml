@@ -19,12 +19,12 @@
 
 import QtQuick 2.0
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
 
 VCWidgetItem
 {
     id: labelRoot
-    property VCButton labelObj: null
+    property VCLabel labelObj: null
     clip: true
 
     onLabelObjChanged:
@@ -37,7 +37,7 @@ VCWidgetItem
         x: 2
         width: parent.width - 4
         height: parent.height
-        font: labelObj ? labelObj.font : null
+        font: labelObj ? labelObj.font : ""
         text: labelObj ? labelObj.caption : ""
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignHCenter

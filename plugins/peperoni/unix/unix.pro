@@ -25,7 +25,7 @@ SOURCES += peperonidevice.cpp \
 
 # This must be after "TARGET = " and before target installation so that
 # install_name_tool can be run before target installation
-macx:include(../../../macx/nametool.pri)
+macx:include(../../../platforms/macos/nametool.pri)
 
 # Installation
 target.path = $$INSTALLROOT/$$PLUGINDIR
@@ -37,8 +37,8 @@ udev.files = z65-peperoni.rules
 !macx:INSTALLS  += udev
 
 unix:!macx {
-   metainfo.path   = $$INSTALLROOT/share/appdata/
-   metainfo.files += qlcplus-peperoni.metainfo.xml
-   INSTALLS       += metainfo 
+   metainfo.path   = $$METAINFODIR
+   metainfo.files += org.qlcplus.QLCPlus.peperoni.metainfo.xml
+   INSTALLS       += metainfo
 }
 

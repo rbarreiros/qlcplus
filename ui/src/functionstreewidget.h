@@ -57,7 +57,7 @@ class FunctionsTreeWidget : public QTreeWidget
 
 public:
     FunctionsTreeWidget(Doc* doc, QWidget *parent = 0);
-    
+
     /** Update all functions to function tree */
     void updateTree();
 
@@ -81,9 +81,6 @@ public:
 private:
     /** Update $item's contents from the given $function */
     void updateFunctionItem(QTreeWidgetItem* item, const Function* function);
-
-    /** Get an icon that represents the given function's type */
-    QIcon functionIcon(const Function* function) const;
 
 private:
     Doc* m_doc;

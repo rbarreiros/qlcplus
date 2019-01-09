@@ -25,8 +25,10 @@
 
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <QElapsedTimer>
 #include <QSettings>
 #include <QDebug>
+#include <qmath.h>
 
 #include "inputoutputmap.h"
 #include "qlcinputchannel.h"
@@ -39,10 +41,13 @@
 #include "qlcfile.h"
 #include "doc.h"
 
+#include "../../plugins/midi/src/common/midiprotocol.h"
+
 InputOutputMap::InputOutputMap(Doc *doc, quint32 universes)
   : QObject(doc)
   , m_blackout(false)
   , m_universeChanged(false)
+  , m_beatTime(new QElapsedTimer())
 {
     m_grandMaster = new GrandMaster(this);
     for (quint32 i = 0; i < universes; i++)
@@ -50,12 +55,14 @@ InputOutputMap::InputOutputMap(Doc *doc, quint32 universes)
 
     connect(doc->ioPluginCache(), SIGNAL(pluginConfigurationChanged(QLCIOPlugin*)),
             this, SLOT(slotPluginConfigurationChanged(QLCIOPlugin*)));
+    connect(doc->masterTimer(), SIGNAL(beat()), this, SLOT(slotMasterTimerBeat()));
 }
 
 InputOutputMap::~InputOutputMap()
 {
     removeAllUniverses();
     delete m_grandMaster;
+    delete m_beatTime;
 }
 
 Doc* InputOutputMap::doc() const
@@ -77,37 +84,35 @@ bool InputOutputMap::toggleBlackout()
     return m_blackout;
 }
 
-void InputOutputMap::setBlackout(bool blackout)
+bool InputOutputMap::setBlackout(bool blackout)
 {
     /* Don't do blackout twice */
     if (m_blackout == blackout)
-        return;
+        return false;
 
-    QMutexLocker locker(&m_universeMutex);
     m_blackout = blackout;
 
-    QByteArray zeros(512, 0);
-    for (quint32 i = 0; i < universesCount(); i++)
+    // blackout is an atomic setting, so it's safe to do it
+    // without mutex locking
+    foreach (Universe *universe, m_universeArray)
     {
-        Universe *universe = m_universeArray.at(i);
-        if (universe->outputPatch() != NULL)
+        for (int i = 0; i < universe->outputPatchesCount(); i++)
         {
-            if (blackout == true)
-                universe->outputPatch()->dump(universe->id(), zeros);
-            // notify the universe listeners that some channels have changed
+            OutputPatch *op = universe->outputPatch(i);
+            if (op != NULL)
+                op->setBlackout(blackout);
         }
-        locker.unlock();
-        if (blackout == true)
-            emit universesWritten(i, zeros);
-        else
-        {
-            const QByteArray postGM = universe->postGMValues()->mid(0, universe->usedChannels());
-            emit universesWritten(i, postGM);
-        }
-        locker.relock();
     }
 
     emit blackoutChanged(m_blackout);
+
+    return true;
+}
+
+void InputOutputMap::requestBlackout(BlackoutRequest blackout)
+{
+    if (blackout != BlackoutRequestNone)
+        setBlackout(blackout == BlackoutRequestOn ? true : false);
 }
 
 bool InputOutputMap::blackout() const
@@ -128,8 +133,12 @@ bool InputOutputMap::addUniverse(quint32 id)
 {
     {
         QMutexLocker locker(&m_universeMutex);
+        Universe *uni = NULL;
+
         if (id == InputOutputMap::invalidUniverse())
+        {
             id = universesCount();
+        }
         else if (id < universesCount())
         {
             qWarning() << Q_FUNC_INFO
@@ -141,15 +150,20 @@ bool InputOutputMap::addUniverse(quint32 id)
         {
             qDebug() << Q_FUNC_INFO
                 << "Gap between universe" << (universesCount() - 1)
-                << "and universe" << id
-                << ", filling the gap...";
+                << "and universe" << id << ", filling the gap...";
             while (id > universesCount())
             {
-                m_universeArray.append(new Universe(universesCount(), m_grandMaster));
+                uni = new Universe(universesCount(), m_grandMaster);
+                connect(doc()->masterTimer(), SIGNAL(tickReady()), uni, SLOT(tick()), Qt::QueuedConnection);
+                connect(uni, SIGNAL(universeWritten(quint32,QByteArray)), this, SIGNAL(universeWritten(quint32,QByteArray)));
+                m_universeArray.append(uni);
             }
         }
 
-        m_universeArray.append(new Universe(id, m_grandMaster));
+        uni = new Universe(id, m_grandMaster);
+        connect(doc()->masterTimer(), SIGNAL(tickReady()), uni, SLOT(tick()), Qt::QueuedConnection);
+        connect(uni, SIGNAL(universeWritten(quint32,QByteArray)), this, SIGNAL(universeWritten(quint32,QByteArray)));
+        m_universeArray.append(uni);
     }
 
     emit universeAdded(id);
@@ -184,6 +198,12 @@ bool InputOutputMap::removeAllUniverses()
     qDeleteAll(m_universeArray);
     m_universeArray.clear();
     return true;
+}
+
+void InputOutputMap::startUniverses()
+{
+    foreach (Universe *uni, m_universeArray)
+        uni->start();
 }
 
 quint32 InputOutputMap::getUniverseID(int index)
@@ -272,30 +292,6 @@ void InputOutputMap::releaseUniverses(bool changed)
     m_universeMutex.unlock();
 }
 
-void InputOutputMap::dumpUniverses()
-{
-    QMutexLocker locker(&m_universeMutex);
-    if (m_blackout == false)
-    {
-        for (int i = 0; i < m_universeArray.count(); i++)
-        {
-            Universe *universe = m_universeArray.at(i);
-            const QByteArray postGM = universe->postGMValues()->mid(0, universe->usedChannels());
-
-            // notify the universe listeners that some channels have changed
-            if (universe->hasChanged())
-            {
-                locker.unlock();
-                emit universesWritten(i, postGM);
-                locker.relock();
-            }
-
-            // this is where QLC+ sends data to the output plugins
-            universe->dumpOutput(postGM);
-        }
-    }
-}
-
 void InputOutputMap::resetUniverses()
 {
     {
@@ -380,13 +376,8 @@ uchar InputOutputMap::grandMasterValue()
 void InputOutputMap::flushInputs()
 {
     QMutexLocker locker(&m_universeMutex);
-
-    for (int i = 0; i < m_universeArray.count(); i++)
-    {
-        Universe *universe = m_universeArray.at(i);
-
+    foreach (Universe *universe, m_universeArray)
         universe->flushInput();
-    }
 }
 
 bool InputOutputMap::setInputPatch(quint32 universe, const QString &pluginName,
@@ -407,6 +398,11 @@ bool InputOutputMap::setInputPatch(quint32 universe, const QString &pluginName,
         currProfile = currInPatch->profile();
         disconnect(currInPatch, SIGNAL(inputValueChanged(quint32,quint32,uchar,const QString&)),
                 this, SIGNAL(inputValueChanged(quint32,quint32,uchar,const QString&)));
+        if (currInPatch->pluginName() == "MIDI")
+        {
+            disconnect(currInPatch, SIGNAL(inputValueChanged(quint32,quint32,uchar,const QString&)),
+                       this, SLOT(slotMIDIBeat(quint32,quint32,uchar)));
+        }
     }
     InputPatch *ip = NULL;
 
@@ -416,8 +412,15 @@ bool InputOutputMap::setInputPatch(quint32 universe, const QString &pluginName,
     {
         ip = m_universeArray.at(universe)->inputPatch();
         if (ip != NULL)
+        {
             connect(ip, SIGNAL(inputValueChanged(quint32,quint32,uchar,const QString&)),
                     this, SIGNAL(inputValueChanged(quint32,quint32,uchar,const QString&)));
+            if (ip->pluginName() == "MIDI")
+            {
+                connect(ip, SIGNAL(inputValueChanged(quint32,quint32,uchar,const QString&)),
+                        this, SLOT(slotMIDIBeat(quint32,quint32,uchar)));
+            }
+        }
     }
     else
     {
@@ -440,14 +443,16 @@ bool InputOutputMap::setInputProfile(quint32 universe, const QString &profileNam
     }
 
     InputPatch *currInPatch = m_universeArray.at(universe)->inputPatch();
-    if (currInPatch == NULL)
-        return false;
+    if (currInPatch != NULL)
+        currInPatch->set(profile(profileName));
 
-    return currInPatch->set(profile(profileName));
+    /* if no input patch is set, then setting a profile is useless,
+       but there's no reason to cause an error here */
+    return true;
 }
 
 bool InputOutputMap::setOutputPatch(quint32 universe, const QString &pluginName,
-                                    quint32 output, bool isFeedback)
+                                    quint32 output, bool isFeedback, int index)
 {
     /* Check that the universe that we're doing mapping for is valid */
     if (universe >= universesCount())
@@ -459,12 +464,23 @@ bool InputOutputMap::setOutputPatch(quint32 universe, const QString &pluginName,
     QMutexLocker locker(&m_universeMutex);
     if (isFeedback == false)
         return m_universeArray.at(universe)->setOutputPatch(
-                    doc()->ioPluginCache()->plugin(pluginName), output);
+                    doc()->ioPluginCache()->plugin(pluginName), output, index);
     else
         return m_universeArray.at(universe)->setFeedbackPatch(
                     doc()->ioPluginCache()->plugin(pluginName), output);
 
     return false;
+}
+
+int InputOutputMap::outputPatchesCount(quint32 universe) const
+{
+    if (universe >= universesCount())
+    {
+        qWarning() << Q_FUNC_INFO << "Universe" << universe << "out of bounds.";
+        return 0;
+    }
+
+    return m_universeArray.at(universe)->outputPatchesCount();
 }
 
 InputPatch *InputOutputMap::inputPatch(quint32 universe) const
@@ -477,14 +493,14 @@ InputPatch *InputOutputMap::inputPatch(quint32 universe) const
     return m_universeArray.at(universe)->inputPatch();
 }
 
-OutputPatch *InputOutputMap::outputPatch(quint32 universe) const
+OutputPatch *InputOutputMap::outputPatch(quint32 universe, int index) const
 {
     if (universe >= universesCount())
     {
         qWarning() << Q_FUNC_INFO << "Universe" << universe << "out of bounds.";
         return NULL;
     }
-    return m_universeArray.at(universe)->outputPatch();
+    return m_universeArray.at(universe)->outputPatch(index);
 }
 
 OutputPatch *InputOutputMap::feedbackPatch(quint32 universe) const
@@ -695,6 +711,12 @@ void InputOutputMap::slotPluginConfigurationChanged(QLCIOPlugin* plugin)
         {
             /*success = */ ip->reconnect();
         }
+
+        OutputPatch* fp = m_universeArray.at(i)->feedbackPatch();
+        if (fp != NULL && fp->plugin() == plugin)
+        {
+            /*success = */ fp->reconnect();
+        }
     }
     locker.unlock();
 
@@ -775,11 +797,10 @@ bool InputOutputMap::addProfile(QLCInputProfile* profile)
 
 bool InputOutputMap::removeProfile(const QString& name)
 {
-    QLCInputProfile* profile;
     QMutableListIterator <QLCInputProfile*> it(m_profiles);
     while (it.hasNext() == true)
     {
-        profile = it.next();
+        QLCInputProfile *profile = it.next();
         if (profile->name() == name)
         {
             it.remove();
@@ -877,6 +898,120 @@ QDir InputOutputMap::userProfileDirectory()
 {
     return QLCFile::userDirectory(QString(USERINPUTPROFILEDIR), QString(INPUTPROFILEDIR),
                                   QStringList() << QString("*%1").arg(KExtInputProfile));
+}
+
+/*********************************************************************
+ * Beats
+ *********************************************************************/
+
+void InputOutputMap::setBeatGeneratorType(InputOutputMap::BeatGeneratorType type)
+{
+    if (type == m_beatGeneratorType)
+        return;
+
+    m_beatGeneratorType = type;
+    qDebug() << "[InputOutputMap] setting beat type:" << m_beatGeneratorType;
+
+    switch (m_beatGeneratorType)
+    {
+        case Internal:
+            doc()->masterTimer()->setBeatSourceType(MasterTimer::Internal);
+            setBpmNumber(doc()->masterTimer()->bpmNumber());
+        break;
+        case MIDI:
+            doc()->masterTimer()->setBeatSourceType(MasterTimer::External);
+            // reset the current BPM number and detect it from the MIDI beats
+            setBpmNumber(0);
+            m_beatTime->restart();
+        break;
+        case Audio:
+            doc()->masterTimer()->setBeatSourceType(MasterTimer::External);
+            // reset the current BPM number and detect it from the audio input
+            setBpmNumber(0);
+            m_beatTime->restart();
+        break;
+        case Disabled:
+        default:
+            doc()->masterTimer()->setBeatSourceType(MasterTimer::None);
+            setBpmNumber(0);
+        break;
+    }
+
+    emit beatGeneratorTypeChanged();
+}
+
+InputOutputMap::BeatGeneratorType InputOutputMap::beatGeneratorType() const
+{
+    return m_beatGeneratorType;
+}
+
+void InputOutputMap::setBpmNumber(int bpm)
+{
+    if (m_beatGeneratorType == Disabled || bpm == m_currentBPM)
+        return;
+
+    //qDebug() << "[InputOutputMap] set BPM to" << bpm;
+    m_currentBPM = bpm;
+
+    if (bpm != 0)
+        doc()->masterTimer()->requestBpmNumber(bpm);
+
+    emit bpmNumberChanged(m_currentBPM);
+}
+
+int InputOutputMap::bpmNumber() const
+{
+    if (m_beatGeneratorType == Disabled)
+        return 0;
+
+    return m_currentBPM;
+}
+
+void InputOutputMap::slotMasterTimerBeat()
+{
+    if (m_beatGeneratorType != Internal)
+        return;
+
+    emit beat();
+}
+
+void InputOutputMap::slotMIDIBeat(quint32 universe, quint32 channel, uchar value)
+{
+    Q_UNUSED(universe)
+
+    // not interested in synthetic release event or non-MBC ones
+    if (m_beatGeneratorType != MIDI || value == 0 || channel < CHANNEL_OFFSET_MBC_PLAYBACK)
+        return;
+
+    qDebug() << "MIDI MBC:" << channel << m_beatTime->elapsed();
+
+    // process the timer as first thing, to avoid wasting time
+    // with the operations below
+    int elapsed = m_beatTime->elapsed();
+    m_beatTime->restart();
+
+    if (channel == CHANNEL_OFFSET_MBC_BEAT)
+    {
+        int bpm = qRound(60000.0 / (float)elapsed);
+        float currBpmTime = 60000.0 / (float)m_currentBPM;
+        // here we check if the difference between the current BPM duration
+        // and the current time elapsed is within a range of +/-1ms.
+        // If it isn't, then the BPM number has really changed, otherwise
+        // it's just a tiny time drift
+        if (qAbs((float)elapsed - currBpmTime) > 1)
+            setBpmNumber(bpm);
+
+        doc()->masterTimer()->requestBeat();
+        emit beat();
+    }
+}
+
+void InputOutputMap::slotAudioSpectrum(double *spectrumBands, int size, double maxMagnitude, quint32 power)
+{
+    Q_UNUSED(spectrumBands)
+    Q_UNUSED(size)
+    Q_UNUSED(maxMagnitude)
+    Q_UNUSED(power)
 }
 
 /*********************************************************************
@@ -1027,6 +1162,10 @@ void InputOutputMap::saveDefaults()
             settings.setValue(key, KOutputNone);
     }
 }
+
+/*********************************************************************
+ * Load & Save
+ *********************************************************************/
 
 bool InputOutputMap::loadXML(QXmlStreamReader &root)
 {

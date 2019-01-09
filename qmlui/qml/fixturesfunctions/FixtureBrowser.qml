@@ -18,8 +18,9 @@
 */
 
 import QtQuick 2.0
-import QtQuick.Controls 1.1
+import QtQuick.Controls 2.1
 
+import org.qlcplus.classes 1.0
 import "."
 
 Rectangle
@@ -28,16 +29,14 @@ Rectangle
     anchors.fill: parent
     color: "transparent"
 
-    property string selectedManufacturer
-    property int manufacturerIndex
+    property int manufacturerIndex: fixtureBrowser.manufacturerIndex
     property string selectedModel
 
     Rectangle
     {
         id: searchBox
-        y: 8
         z: 1
-        height: 30
+        height: UISettings.iconSizeMedium
         anchors.right: parent.right
         anchors.rightMargin: 8
         anchors.left: parent.left
@@ -47,16 +46,17 @@ Rectangle
         border.width: 2
         border.color: "#111"
 
-        Image
+        Text
         {
             id: searchIcon
+            x: 3
             y: 3
-            width: 24
-            height: 24
-            anchors.left: parent.left
-            anchors.leftMargin: 6
-            source: "qrc:/search.svg"
-            sourceSize: Qt.size(24, 24)
+            width: height
+            height: parent.height - 6
+            color: "gray"
+            font.family: "FontAwesome"
+            font.pixelSize: height
+            text: FontAwesome.fa_search
         }
 
         TextInput
@@ -64,11 +64,16 @@ Rectangle
             id: textEdit1
             x: searchIcon.width + 10
             y: 3
-            height: 24
+            height: parent.height - 6
             width: searchBox.width - searchIcon.width - 10
             color: UISettings.fgMain
-            text: qsTr("")
-            font.pixelSize: 18
+            text: fixtureBrowser.searchFilter
+            font.family: "Roboto Condensed"
+            font.pixelSize: height
+            selectionColor: UISettings.highlightPressed
+            selectByMouse: true
+
+            onTextChanged: fixtureBrowser.searchFilter = text
         }
     }
 
@@ -77,6 +82,7 @@ Rectangle
         id: manufacturerList
         x: 8
         z: 0
+        visible: fixtureBrowser.selectedManufacturer.length == 0 && fixtureBrowser.searchFilter.length < 3
         anchors.top: searchBox.bottom
         anchors.topMargin: 6
         anchors.bottom: parent.bottom
@@ -86,63 +92,60 @@ Rectangle
         anchors.left: parent.left
         anchors.leftMargin: 8
         focus: true
+
         boundsBehavior: Flickable.StopAtBounds
+        currentIndex: manufacturerIndex
+
         highlight: Component
         {
             Rectangle
             {
-                width: parent.width - 30; height: 31
-                color: "#0978FF"; radius: 5
-                y: manufacturerList.currentItem.y + 1
+                y: manufacturerList.currentItem.y
+                width: parent.width - 30
+                height: UISettings.listItemHeight
+                color: "#0978FF"
+                radius: 5
             }
         }
         highlightFollowsCurrentItem: false
 
-        model: fixtureBrowser.manufacturers()
+        model: fixtureBrowser.manufacturers
         delegate: FixtureBrowserDelegate
         {
             isManufacturer: true
-            onClicked:
+            textLabel: modelData
+            onMouseEvent:
             {
-                selectedManufacturer = modelData
-                mfText.label = modelData
-                //console.log("Pressed:" + modelData)
-                manufacturerList.visible = false
-                fixtureList.model = fixtureBrowser.models(modelData)
-                fixtureList.currentIndex = -1
-                fixtureArea.visible = true
-                manufacturerList.currentIndex = index
+                if (type == App.Clicked)
+                {
+                    mfText.label = modelData
+                    fixtureBrowser.manufacturerIndex = index
+                    fixtureBrowser.selectedManufacturer = modelData
+                    modelsList.currentIndex = -1
+                }
             }
         }
 
-        Component.onCompleted:
-        {
-            manufacturerIndex = fixtureBrowser.genericIndex()
-            manufacturerList.currentIndex = fixtureBrowser.genericIndex()
-            manufacturerList.positionViewAtIndex(manufacturerIndex, ListView.Center)
-        }
-        ScrollBar { flickable: manufacturerList }
+        Component.onCompleted: manufacturerList.positionViewAtIndex(manufacturerIndex, ListView.Center)
+
+        ScrollBar.vertical: CustomScrollBar { }
     }
 
     Rectangle
     {
         id: fixtureArea
-        visible: false
+        visible: fixtureBrowser.selectedManufacturer.length && fixtureBrowser.searchFilter.length < 3
         color: "transparent"
 
+        width: parent.width
+        height: parent.height - searchBox.height - (fxPropsRect.visible ? fxPropsRect.height : 0)
         anchors.top: searchBox.bottom
-        anchors.topMargin: 6
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 6
-        anchors.right: parent.right
-        anchors.rightMargin: 8
-        anchors.left: parent.left
-        anchors.leftMargin: 8
+        anchors.margins: 6
 
         Rectangle
         {
             id: manufBackLink
-            height: 40
+            height: UISettings.iconSizeMedium
             z: 1
             anchors.right: parent.right
             anchors.left: parent.left
@@ -157,8 +160,8 @@ Rectangle
                 anchors.verticalCenter: parent.verticalCenter
                 source: "qrc:/arrow-right.svg"
                 sourceSize: Qt.size(width, height)
-                height: 26
-                width: 18
+                height: parent.height
+                width: height * 0.8
             }
 
             RobotoText
@@ -167,7 +170,7 @@ Rectangle
                 anchors.left: leftArrow.right
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                fontSize: 18
+                fontSize: UISettings.textSizeDefault
                 fontBold: true
                 labelColor: UISettings.fgMedium
             }
@@ -179,64 +182,152 @@ Rectangle
 
                 onClicked:
                 {
-                    fixtureArea.visible = false
                     fxPropsRect.visible = false
-                    manufacturerList.visible = true
+                    panelPropsRect.visible = false
+                    fixtureBrowser.selectedManufacturer = ""
                 }
             }
         }
 
         ListView
         {
-            id: fixtureList
-            x: 8
+            id: modelsList
             z: 0
+
+            width: parent.width
+            height: parent.height - manufBackLink.height - 12
             anchors.top: manufBackLink.bottom
-            anchors.topMargin: 6
-            anchors.bottom: fxPropsRect.visible ? fxPropsRect.top : parent.bottom
-            anchors.bottomMargin: 6
-            anchors.right: parent.right
-            anchors.left: parent.left
+            anchors.margins: 6
+
             focus: true
             boundsBehavior: Flickable.StopAtBounds
             highlight:
                 Rectangle
                 {
-                    width: fixtureList.width - 30
-                    height: 31
+                    width: modelsList.width - 30
+                    height: UISettings.listItemHeight - 2
                     color: UISettings.highlight
                     radius: 5
-                    y: fixtureList.currentItem ? fixtureList.currentItem.y + 1 : 0
+                    y: modelsList.currentItem ? modelsList.currentItem.y + 1 : 0
                 }
             highlightFollowsCurrentItem: false
 
+            model: fixtureBrowser.modelsList
             delegate: FixtureBrowserDelegate
             {
                 id: dlg
-                manufacturer: selectedManufacturer
-                onClicked:
+                manufacturer: fixtureBrowser.selectedManufacturer
+                textLabel: modelData
+
+                onMouseEvent:
                 {
-                    fixtureList.currentIndex = index
-                    fixtureBrowser.model = modelData
-                    fxPropsRect.fxManufacturer = selectedManufacturer
-                    fxPropsRect.fxModel = modelData
-                    fxPropsRect.fxName = modelData
-                    fxPropsRect.visible = true
+                    if (type == App.Clicked)
+                    {
+                        modelsList.currentIndex = index
+                        fixtureBrowser.selectedModel = modelData
+                        if (modelData == "Generic RGB Panel")
+                        {
+                            fxPropsRect.visible = false
+                            panelPropsRect.visible = true
+                        }
+                        else
+                        {
+                            panelPropsRect.visible = false
+                            fxPropsRect.visible = true
+                        }
+                    }
                 }
             }
-            ScrollBar { flickable: fixtureList }
+            ScrollBar.vertical: CustomScrollBar { }
         }
+    }
 
-        FixtureProperties
+    Flickable
+    {
+        id: searchRect
+        clip: true
+        visible: fixtureBrowser.searchFilter.length >= 3 ? true : false
+        boundsBehavior: Flickable.StopAtBounds
+
+        contentHeight: searchColumn.height
+
+        width: parent.width
+        height: parent.height - searchBox.height - (fxPropsRect.visible ? fxPropsRect.height : 0) - 12
+        anchors.top: searchBox.bottom
+        anchors.margins: 6
+
+        Column
         {
-            id: fxPropsRect
-            anchors.right: parent.right
-            anchors.rightMargin: 4
-            anchors.left: parent.left
-            anchors.leftMargin: 4
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 8
-            visible: false
-        }
+            id: searchColumn
+            width: parent.width
+
+            Repeater
+            {
+                id: searchListView
+                anchors.fill: parent
+                z: 4
+                model: fixtureBrowser.searchTreeModel
+                delegate:
+                    Component
+                    {
+                        Loader
+                        {
+                            width: searchListView.width
+                            source: hasChildren ? "qrc:/TreeNodeDelegate.qml" : "qrc:/FixtureBrowserDelegate.qml"
+                            onLoaded:
+                            {
+                                if (hasChildren)
+                                {
+                                    item.textLabel = label
+                                    item.nodePath = path
+                                    item.itemIcon = ""
+                                    item.isExpanded = true
+                                    item.childrenDelegate = "qrc:/FixtureBrowserDelegate.qml"
+                                    item.nodeChildren = childrenModel
+                                }
+                            }
+                            Connections
+                            {
+                                target: item
+                                onMouseEvent:
+                                {
+                                    if (type === App.Clicked)
+                                    {
+                                        console.log("Item clicked with path: " + item.nodePath + "/" + qItem.textLabel)
+                                        model.isSelected = 2
+                                        qItem.manufacturer = item.nodePath
+                                        fixtureBrowser.selectedManufacturer = qItem.manufacturer
+                                        fixtureBrowser.selectedModel = qItem.textLabel
+                                        fxPropsRect.visible = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+            } // end of Repeater
+        } // end of Column
+
+        ScrollBar.vertical: CustomScrollBar { }
+    } // end of Flickable
+
+    FixtureProperties
+    {
+        id: fxPropsRect
+        anchors.right: parent.right
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 8
+        visible: false
+    }
+
+    RGBPanelProperties
+    {
+        objectName: "RGBPanelProps"
+        id: panelPropsRect
+        anchors.right: parent.right
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 8
+        visible: false
     }
 }

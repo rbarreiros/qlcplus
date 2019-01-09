@@ -20,33 +20,24 @@
 import QtQuick 2.0
 import QtQuick.Layouts 1.1
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
+import "."
 
 Rectangle
 {
-    width: 100
-    height: 40
+    height: UISettings.iconSizeDefault
     color: "transparent"
 
     property string iSrc
     property string tLabel
+    property color tLabelColor: UISettings.fgMain
+    property int tFontSize: UISettings.textSizeDefault
     property int functionType: -1
+    property string faSource: ""
+    property color faColor: "#222"
+    property int iconSize: height - 4
 
-    onFunctionTypeChanged:
-    {
-        switch (functionType)
-        {
-            case Function.Scene: iSrc = "qrc:/scene.svg"; break;
-            case Function.Chaser: iSrc = "qrc:/chaser.svg"; break;
-            case Function.EFX: iSrc = "qrc:/efx.svg"; break;
-            case Function.Collection: iSrc = "qrc:/collection.svg"; break;
-            case Function.Script: iSrc = "qrc:/script.svg"; break;
-            case Function.RGBMatrix: iSrc = "qrc:/rgbmatrix.svg"; break;
-            case Function.Show: iSrc = "qrc:/showmanager.svg"; break;
-            case Function.Audio: iSrc = "qrc:/audio.svg"; break;
-            case Function.Video: iSrc = "qrc:/video.svg"; break;
-        }
-    }
+    onFunctionTypeChanged: iSrc = functionManager.functionIcon(functionType)
 
     RowLayout
     {
@@ -55,20 +46,33 @@ Rectangle
 
         Image
         {
+            visible: iSrc ? true : false
             source: iSrc
-            height: parent.height - 4
-            width: height
-            sourceSize: Qt.size(width, height)
+            height: iconSize
+            width: iconSize
+            sourceSize: Qt.size(iconSize, iconSize)
+        }
+
+        Text
+        {
+            id: faIcon
+            visible: faSource ? true : false
+            color: faColor
+            font.family: "FontAwesome"
+            font.pixelSize: iconSize
+            text: faSource
         }
 
         RobotoText
         {
             Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
             height: parent.height
-            anchors.verticalCenter: parent.verticalCenter
             label: tLabel
-            fontSize: 11
+            labelColor: tLabelColor
+            fontSize: tFontSize
         }
     }
 }
+
 

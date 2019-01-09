@@ -7,14 +7,14 @@
 
   Copyright (c) 2015 Massimo Callegari
 
-  Licensed under the Apache License, Version 2.0 (the "License");
+  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
 
       http://www.apache.org/licenses/LICENSE-2.0.txt
 
   Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
+  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
@@ -25,7 +25,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>570</width>
+    <width>581</width>
     <height>442</height>
    </rect>
   </property>
@@ -70,13 +70,6 @@
        <string>Cue List</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="0">
-        <widget class="QLabel" name="m_chaserLabel">
-         <property name="text">
-          <string>Chaser</string>
-         </property>
-        </widget>
-       </item>
        <item row="0" column="1">
         <widget class="QLineEdit" name="m_chaserEdit">
          <property name="toolTip">
@@ -121,14 +114,21 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="0" colspan="4">
+       <item row="0" column="0">
+        <widget class="QLabel" name="m_chaserLabel">
+         <property name="text">
+          <string>Chaser</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="4">
         <widget class="QLabel" name="label_11">
          <property name="text">
           <string>Behavior of the Next/Previous buttons when the chaser is not active</string>
          </property>
         </widget>
        </item>
-       <item row="2" column="0" colspan="4">
+       <item row="3" column="0" colspan="4">
         <widget class="QComboBox" name="m_nextPrevBehaviorCombo">
          <property name="toolTip">
           <string>Behavior of the Next/Previous buttons when the chaser is not active</string>
@@ -158,7 +158,7 @@
          </item>
         </widget>
        </item>
-       <item row="3" column="0" colspan="4">
+       <item row="4" column="0" colspan="4">
         <spacer name="verticalSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -171,6 +171,32 @@
          </property>
         </spacer>
        </item>
+       <item row="1" column="0" colspan="4">
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Playback buttons layout</string>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QRadioButton" name="m_play_pause_stop">
+            <property name="text">
+             <string>Play/Pause + Stop</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="m_play_stop_pause">
+            <property name="text">
+             <string>Play/Stop + Pause</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tab">
@@ -180,6 +206,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <layout class="QHBoxLayout" name="m_playbackLayout"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="m_stopLayout"/>
        </item>
        <item>
         <spacer name="verticalSpacer_4">
@@ -244,7 +273,7 @@
      </widget>
      <widget class="QWidget" name="SideSliders">
       <attribute name="title">
-       <string>Side Faders</string>
+       <string>Side Fader</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
@@ -260,9 +289,9 @@
            <number>4</number>
           </property>
           <item>
-           <widget class="QRadioButton" name="m_crossFadeRadio">
+           <widget class="QRadioButton" name="m_noneRadio">
             <property name="text">
-             <string>Crossfade</string>
+             <string>None</string>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -270,7 +299,17 @@
            </widget>
           </item>
           <item>
-           <widget class="QRadioButton" name="m_sweepButton">
+           <widget class="QRadioButton" name="m_crossFadeRadio">
+            <property name="text">
+             <string>Crossfade</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="m_stepsRadio">
             <property name="text">
              <string>Steps</string>
             </property>
@@ -305,6 +344,19 @@
           </item>
          </layout>
         </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_5">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>

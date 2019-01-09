@@ -18,18 +18,21 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Layouts 1.1
 
-import com.qlcplus.classes 1.0
-import "PluginUtils.js" as PluginUtils
+import org.qlcplus.classes 1.0
+import "GenericHelpers.js" as Helpers
+import "."
 
 Rectangle
 {
     width: parent.width
-    height: 80
+    height: UISettings.bigItemHeight * 0.9
     color: "transparent"
 
     property int universeID
     property OutputPatch patch
+    property int patchIndex
 
     Rectangle
     {
@@ -38,37 +41,87 @@ Rectangle
         height: parent.height
         z: 1
         radius: 3
-        gradient: Gradient
-        {
-            id: bgGradient
-            GradientStop { position: 0.75 ; color: "#999" }
-            GradientStop { position: 1 ; color: "#333" }
-        }
+        color: UISettings.bgLighter
         border.width: 2
         border.color: "#111"
 
-        Row
+        RowLayout
         {
             x: 8
-            spacing: 3
+            width: parent.width - 16
+            spacing: 5
+
+            Column
+            {
+                height: patchBox.height
+                spacing: 1
+
+                IconButton
+                {
+                    imgSource: checked ? "qrc:/pause.svg" : "qrc:/play.svg"
+                    bgColor: "green"
+                    checkedColor: "red"
+                    checkable: true
+                    checked: patch ? patch.paused : false
+                    tooltip: qsTr("Play/Pause this output patch")
+                    onToggled: if (patch) patch.paused = checked
+                }
+                IconButton
+                {
+                    faSource: checked ? FontAwesome.fa_eye_slash : FontAwesome.fa_eye
+                    faColor: UISettings.fgMain
+                    bgColor: "green"
+                    checkedColor: "red"
+                    checkable: true
+                    checked: patch ? patch.blackout : false
+                    tooltip: qsTr("Enable/Disable a blackout on this output patch")
+                    onToggled: if (patch) patch.blackout = checked
+                }
+            }
+
             Image
             {
-                id: pluginIcon
-                y: 2
-                height: patchBox.height - 6
+                Layout.alignment: Qt.AlignVCenter
+                height: patchBox.height * 0.75
                 width: height
-                source: patch ? PluginUtils.iconFromName(patch.pluginName) : ""
+                source: patch ? Helpers.pluginIconFromName(patch.pluginName) : ""
                 sourceSize: Qt.size(width, height)
                 fillMode: Image.Stretch
             }
             RobotoText
             {
                 height: patchBox.height
-                width: patchBox.width - pluginIcon.width - 6
+                Layout.fillWidth: true
                 label: patch ? patch.outputName : ""
                 labelColor: "black"
                 wrapText: true
+                fontSize: UISettings.textSizeDefault
             }
+        }
+    }
+
+    DropArea
+    {
+        id: patchDropTarget
+        anchors.fill: parent
+        z: 5
+
+        // this key must match the one in PluginList, to avoid dropping
+        // an input plugin on output and vice-versa
+        keys: [ "output-" + universeID ]
+
+        onDropped:
+        {
+            console.log("Requested to replace an output patch")
+            ioManager.setOutputPatch(drag.source.pluginUniverse, drag.source.pluginName,
+                                     drag.source.pluginLine, patchIndex)
+        }
+
+        Rectangle
+        {
+            id: outDropRect
+            anchors.fill: parent
+            color: patchDropTarget.containsDrag ? "#7F00FF00" : "transparent"
         }
     }
 }

@@ -81,12 +81,18 @@ bool SPIPlugin::openOutput(quint32 output, quint32 universe)
     m_spifd = open(SPI_DEFAULT_DEVICE, O_RDWR);
     if(m_spifd < 0)
     {
-        qWarning() << "Cannot open SPI device !";
+        qWarning() << "Cannot open SPI device!";
         return false;
     }
 
+    QSettings settings;
+    int speed = 1000000;
+    QVariant value = settings.value("SPIPlugin/frequency");
+    if (value.isValid() == true)
+        speed = value.toUInt();
+
     m_outThread = new SPIOutThread();
-    m_outThread->runThread(m_spifd);
+    m_outThread->runThread(m_spifd, speed);
 
     return true;
 }
@@ -218,6 +224,8 @@ void SPIPlugin::configure()
     {
         QSettings settings;
         settings.setValue("SPIPlugin/frequency", QVariant(conf.frequency()));
+        if (m_outThread != NULL)
+            m_outThread->setSpeed(conf.frequency());
     }
 }
 

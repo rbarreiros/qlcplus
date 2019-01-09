@@ -20,33 +20,57 @@
 import QtQuick 2.2
 import QtQuick.Controls 1.2
 
+import "."
+
 Rectangle
 {
-    id: baseIconEntry
+    id: baseMenuEntry
     width: parent ? (parent.width > itemWidth) ? parent.width : itemWidth : 400
-    height: imgSize + 4
+    height: iconHeight + 4
 
-    property int imgSize: 40
+    property int iconHeight: UISettings.iconSizeDefault
+    property int iconWidth: iconHeight
     property string imgSource: ""
     property string entryText: ""
     property color bgColor: "transparent"
-    property color hoverColor: "#0978FF"
-    property color pressedColor: "#054A9E"
-    property int itemWidth: imgSize + (textBox ? textBox.width : 100) + 15
+    property color hoverColor: UISettings.highlight
+    property color pressColor: UISettings.highlightPressed
+    property int itemWidth: btnIcon.width + (textBox ? textBox.width : 100) + 15
 
     signal clicked
     signal entered
     signal exited
 
-    color: "transparent"
-    border.color: "#1D1D1D"
+    color: bgColor
+    border.color: UISettings.bgLight
     border.width: 1
+
+    states: [
+        State
+        {
+            when: entryMouseArea.pressed
+            PropertyChanges
+            {
+                target: baseMenuEntry
+                color: pressColor
+            }
+        },
+        State
+        {
+            when: entryMouseArea.containsMouse
+            PropertyChanges
+            {
+                target: baseMenuEntry
+                color: hoverColor
+            }
+        }
+    ]
 
     Image
     {
         id: btnIcon
-        height: imgSource ? imgSize : 0
-        width: height
+        height: imgSource ? iconHeight : 0
+        width: imgSource ? iconWidth : 0
         x: 5
         y: 2
         source: imgSource
@@ -56,25 +80,29 @@ Rectangle
     RobotoText
     {
         id: textBox
-        x: btnIcon.width + 7
+        x: btnIcon.x + btnIcon.width + 2
         y: 0
         label: entryText
-        height: baseIconEntry.height
-        fontSize: 12
+        height: baseMenuEntry.height
+        fontSize: UISettings.textSizeDefault
         fontBold: true
     }
 
     MouseArea
     {
-        id: mouseArea1
+        id: entryMouseArea
         anchors.fill: parent
-        hoverEnabled: true
-        onEntered: { baseIconEntry.color = hoverColor; baseIconEntry.entered() }
-        onExited: { baseIconEntry.color = bgColor; baseIconEntry.exited() }
-        onPressed: { baseIconEntry.color = pressedColor }
-        onReleased:
-        {
-            baseIconEntry.clicked();
-        }
+        hoverEnabled: baseMenuEntry.visible
+        onEntered: baseMenuEntry.entered()
+        onExited: baseMenuEntry.exited()
+        onReleased: baseMenuEntry.clicked()
+    }
+
+    Rectangle
+    {
+        anchors.fill: parent
+        color: "black"
+        opacity: 0.6
+        visible: !parent.enabled
     }
 }

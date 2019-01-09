@@ -77,7 +77,7 @@ AddChannelsGroup::AddChannelsGroup(QWidget* parent, Doc* doc, ChannelsGroup *gro
         if (topItem == NULL)
         {
             topItem = new QTreeWidgetItem(m_tree);
-            topItem->setText(KColumnName, tr("Universe %1").arg(uni + 1));
+            topItem->setText(KColumnName, m_doc->inputOutputMap()->universes().at(uni)->name());
             topItem->setText(KColumnID, QString::number(uni));
             topItem->setExpanded(true);
         }
@@ -85,7 +85,7 @@ AddChannelsGroup::AddChannelsGroup(QWidget* parent, Doc* doc, ChannelsGroup *gro
         QTreeWidgetItem *fItem = new QTreeWidgetItem(topItem);
         fItem->setExpanded(true);
         fItem->setText(KColumnName, fxi->name());
-        fItem->setIcon(KColumnName, fxi->getIconFromType(fxi->type()));
+        fItem->setIcon(KColumnName, fxi->getIconFromType());
         fItem->setText(KColumnID, QString::number(fxi->id()));
 
         for (quint32 c = 0; c < fxi->channels(); c++)
@@ -116,9 +116,7 @@ AddChannelsGroup::AddChannelsGroup(QWidget* parent, Doc* doc, ChannelsGroup *gro
             item->setText(KColumnChIdx, QString::number(c));
         }
     }
-    m_tree->resizeColumnToContents(KColumnName);
-    m_tree->resizeColumnToContents(KColumnType);
-    m_tree->resizeColumnToContents(KColumnGroup);
+    m_tree->header()->resizeSections(QHeaderView::ResizeToContents);
 
     QSettings settings;
     QVariant var = settings.value(SETTINGS_APPLYALL);
@@ -136,6 +134,10 @@ AddChannelsGroup::AddChannelsGroup(QWidget* parent, Doc* doc, ChannelsGroup *gro
 
     connect(m_tree, SIGNAL(itemChanged(QTreeWidgetItem*,int)),
             this, SLOT(slotItemChecked(QTreeWidgetItem*, int)));
+    connect(m_collapseButton, SIGNAL(clicked(bool)),
+            m_tree, SLOT(collapseAll()));
+    connect(m_expandButton, SIGNAL(clicked(bool)),
+            m_tree, SLOT(expandAll()));
 }
 
 AddChannelsGroup::~AddChannelsGroup()

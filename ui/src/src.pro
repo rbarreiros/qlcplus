@@ -134,6 +134,7 @@ HEADERS += virtualconsole/addvcbuttonmatrix.h \
            virtualconsole/vccuelistproperties.h \
            virtualconsole/vcdockarea.h \
            virtualconsole/vcframe.h \
+           virtualconsole/vcframepageshortcut.h \
            virtualconsole/vcframeproperties.h \
            virtualconsole/vclabel.h \
            virtualconsole/vcmatrix.h \
@@ -308,6 +309,7 @@ SOURCES += virtualconsole/addvcbuttonmatrix.cpp \
            virtualconsole/vccuelistproperties.cpp \
            virtualconsole/vcdockarea.cpp \
            virtualconsole/vcframe.cpp \
+           virtualconsole/vcframepageshortcut.cpp \
            virtualconsole/vcframeproperties.cpp \
            virtualconsole/vclabel.cpp \
            virtualconsole/vcmatrix.cpp \
@@ -355,7 +357,7 @@ TRANSLATIONS += qlcplus_ja_JP.ts
 macx {
     # This must be after "TARGET = " and before target installation so that
     # install_name_tool can be run before target installation
-    include(../../macx/nametool.pri)
+    include(../../platforms/macos/nametool.pri)
 }
 
 # Installation

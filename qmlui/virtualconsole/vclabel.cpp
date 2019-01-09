@@ -30,19 +30,24 @@ VCLabel::VCLabel(Doc *doc, QObject *parent)
 
 VCLabel::~VCLabel()
 {
+    if (m_item)
+        delete m_item;
 }
 
-void VCLabel::setID(quint32 id)
+QString VCLabel::defaultCaption()
 {
-    VCWidget::setID(id);
+    return tr("Label %1").arg(id() + 1);
+}
 
-    if (caption().isEmpty())
-        setCaption(tr("Label %1").arg(id));
+void VCLabel::setupLookAndFeel(qreal pixelDensity, int page)
+{
+    setPage(page);
+    setDefaultFontSize(pixelDensity * 3.5);
 }
 
 void VCLabel::render(QQuickView *view, QQuickItem *parent)
 {
-    if (view == NULL || parent == NULL)
+    if (view == nullptr || parent == nullptr)
         return;
 
     QQmlComponent *component = new QQmlComponent(view->engine(), QUrl("qrc:/VCLabelItem.qml"));
@@ -53,10 +58,24 @@ void VCLabel::render(QQuickView *view, QQuickItem *parent)
         return;
     }
 
-    QQuickItem *item = qobject_cast<QQuickItem*>(component->create());
+    m_item = qobject_cast<QQuickItem*>(component->create());
 
-    item->setParentItem(parent);
-    item->setProperty("labelObj", QVariant::fromValue(this));
+    m_item->setParentItem(parent);
+    m_item->setProperty("labelObj", QVariant::fromValue(this));
+}
+
+VCWidget *VCLabel::createCopy(VCWidget *parent)
+{
+    Q_ASSERT(parent != nullptr);
+
+    VCLabel *label = new VCLabel(m_doc, parent);
+    if (label->copyFrom(this) == false)
+    {
+        delete label;
+        label = nullptr;
+    }
+
+    return label;
 }
 
 /*********************************************************************
@@ -93,6 +112,27 @@ bool VCLabel::loadXML(QXmlStreamReader &root)
             root.skipCurrentElement();
         }
     }
+
+    return true;
+}
+
+bool VCLabel::saveXML(QXmlStreamWriter *doc)
+{
+    Q_ASSERT(doc != nullptr);
+
+    /* VC label entry */
+    doc->writeStartElement(KXMLQLCVCLabel);
+
+    saveXMLCommon(doc);
+
+    /* Window state */
+    saveXMLWindowState(doc);
+
+    /* Appearance */
+    saveXMLAppearance(doc);
+
+    /* End the <Label> tag */
+    doc->writeEndElement();
 
     return true;
 }

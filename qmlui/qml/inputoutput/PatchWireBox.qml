@@ -19,33 +19,78 @@
 
 import QtQuick 2.0
 
-Canvas {
+import "."
+
+Canvas
+{
     id: wireBox
     width: 50
     height: 120
+    contextType: "2d"
 
     property int patchesNumber: 0
+    property bool showFeedback: false
 
     onPatchesNumberChanged: requestPaint()
+    onShowFeedbackChanged: requestPaint()
 
-    onPaint: {
-        var ctx = wireBox.getContext('2d');
-        var vCenter = height / 2;
+    onPaint:
+    {
         var nodeSize = 8
-        ctx.strokeStyle = "yellow";
-        ctx.fillStyle = "yellow";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.clearRect(0, 0, width, height);
+        var halfNode = nodeSize / 2
+        var vCenter = (height / 2) - halfNode
+        context.strokeStyle = "yellow"
+        context.fillStyle = "yellow"
+        context.lineWidth = 3
+        context.beginPath()
+        context.clearRect(0, 0, width, height)
+
+        var yDelta = height / patchesNumber
+        var yPos = (yDelta / 2) - halfNode
+        var targetX = width - nodeSize
 
         if (patchesNumber > 0)
         {
-            ctx.ellipse(ctx.lineWidth, vCenter, nodeSize, nodeSize);
-            ctx.lineTo(width - nodeSize - ctx.lineWidth, vCenter + nodeSize / 2);
-            ctx.ellipse(width - nodeSize - ctx.lineWidth, vCenter, nodeSize, nodeSize);
-            ctx.fill();
-            ctx.stroke();
+            context.ellipse(0, vCenter - halfNode, nodeSize, nodeSize)
+            context.fill()
+
+            context.beginPath()
+            context.moveTo(context.lineWidth, vCenter)
+            context.lineTo(targetX / 2, vCenter)
+            context.stroke()
+
+            for (var i = 0; i < patchesNumber; i++)
+            {
+                context.beginPath()
+                context.ellipse(targetX, yPos - halfNode, nodeSize, nodeSize)
+                context.fill()
+
+                context.beginPath()
+                context.moveTo(targetX / 2, vCenter)
+                context.lineTo(targetX / 2, yPos)
+                context.lineTo(targetX, yPos)
+                context.stroke()
+
+                yPos += yDelta
+            }
         }
-        ctx.closePath();
+        if (showFeedback)
+        {
+            yPos = vCenter + (UISettings.bigItemHeight * 0.4) - (UISettings.iconSizeMedium * 0.4)
+            context.strokeStyle = "#00FF00"
+            context.fillStyle = "#00FF00"
+
+            context.ellipse(0, yPos - halfNode, nodeSize, nodeSize)
+            context.fill()
+
+            context.beginPath()
+            context.moveTo(context.lineWidth, yPos)
+            context.lineTo(targetX, yPos)
+            context.stroke()
+
+            context.beginPath()
+            context.ellipse(targetX, yPos - halfNode, nodeSize, nodeSize)
+            context.fill()
+        }
     }
 }

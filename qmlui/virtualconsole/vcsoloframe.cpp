@@ -29,9 +29,14 @@ VCSoloFrame::~VCSoloFrame()
 {
 }
 
+QString VCSoloFrame::defaultCaption()
+{
+    return tr("Solo Frame %1").arg(id() + 1);
+}
+
 void VCSoloFrame::render(QQuickView *view, QQuickItem *parent)
 {
-    if (view == NULL || parent == NULL)
+    if (view == nullptr || parent == nullptr)
         return;
 
     QQmlComponent *component = new QQmlComponent(view->engine(), QUrl("qrc:/VCFrameItem.qml"));
@@ -56,6 +61,31 @@ void VCSoloFrame::render(QQuickView *view, QQuickItem *parent)
         foreach(VCWidget *child, m_pagesMap.keys())
             child->render(view, childrenArea);
     }
+}
+
+VCWidget *VCSoloFrame::createCopy(VCWidget *parent)
+{
+    Q_ASSERT(parent != nullptr);
+
+    VCSoloFrame *frame = new VCSoloFrame(m_doc, m_vc, parent);
+    if (frame->copyFrom(this) == false)
+    {
+        delete frame;
+        frame = nullptr;
+    }
+
+    return frame;
+}
+
+bool VCSoloFrame::copyFrom(const VCWidget *widget)
+{
+    const VCSoloFrame *frame = qobject_cast<const VCSoloFrame*> (widget);
+    if (frame == nullptr)
+        return false;
+
+    // setSoloframeMixing(frame->soloframeMixing()); // TODO
+
+    return VCFrame::copyFrom(widget);
 }
 
 /*********************************************************************

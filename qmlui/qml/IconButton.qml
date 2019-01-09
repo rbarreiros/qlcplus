@@ -18,30 +18,31 @@
 */
 
 import QtQuick 2.2
-import QtQuick.Controls 1.2
-import QtQuick.Controls.Styles 1.1
-import QtQuick.Controls.Private 1.0
+import QtQuick.Controls 2.1
 
 import "."
 
-Rectangle
+Button
 {
-    id: baseIconButton
-    width: UISettings.iconSizeDefault
-    height: UISettings.iconSizeDefault
+    id: control
     visible: counter ? true : false
+    height: UISettings.iconSizeDefault
+    width: UISettings.iconSizeDefault
+    hoverEnabled: true
+    padding: 0
+    topPadding: 0
+    bottomPadding: 0
+    leftPadding: 0
+    rightPadding: 0
 
+    property int counter: 1
     property color bgColor: UISettings.bgLight
     property color hoverColor: UISettings.hover
-    property color pressColor: "#054A9E"
+    property color pressColor: UISettings.highlightPressed
     property color checkedColor: UISettings.highlight
 
-    property bool checkable: false
-    property bool checked: false
-    property int counter: 1
-
-    property ExclusiveGroup exclusiveGroup: null
-
+    property alias border: contentBody.border
+    property alias radius: contentBody.radius
     property string imgSource: ""
     property int imgMargins: 4
     property string faSource: ""
@@ -49,70 +50,126 @@ Rectangle
 
     property string tooltip: ""
 
-    signal clicked
-    signal toggled
-
-    color: checked ? checkedColor : (mouseArea1.containsMouse ? hoverColor : bgColor)
-    radius: 5
-    border.color: "#1D1D1D"
-    border.width: 2
-
-    onExclusiveGroupChanged:
-    {
-        if (exclusiveGroup)
-            exclusiveGroup.bindCheckable(baseIconButton)
-    }
     onCounterChanged:
     {
-        if (counter == 0)
-            checked = false
-    }
-
-    Image
-    {
-        id: btnIcon
-        visible: imgSource ? true : false
-        anchors.fill: parent
-        anchors.margins: imgMargins
-        source: imgSource
-        sourceSize: Qt.size(width, height)
-    }
-
-    Text
-    {
-        id: faIcon
-        anchors.centerIn: parent
-        visible: faSource ? true : false
-        color: faColor
-        font.family: "FontAwesome"
-        font.pixelSize: parent.height - 4
-        text: faSource
-    }
-
-    MouseArea
-    {
-        id: mouseArea1
-        anchors.fill: parent
-        hoverEnabled: true
-        onExited: { Tooltip.hideText() }
-        onReleased:
+        if (counter == 0 && checkable && checked)
         {
-            if (checkable == true)
+            control.toggle()
+            control.toggled()
+        }
+    }
+
+    Rectangle
+    {
+        anchors.fill: parent
+        color: "black"
+        opacity: 0.6
+        visible: !parent.enabled
+    }
+
+    ToolTip
+    {
+        visible: tooltip && hovered
+        text: tooltip
+        delay: 1000
+        timeout: 5000
+        background:
+            Rectangle
             {
-                checked = !checked
-                baseIconButton.toggled(checked)
+                color: UISettings.bgMain
+                border.width: 1
+                border.color: UISettings.bgLight
             }
-            else
-                baseIconButton.clicked()
-        }
-
-        onCanceled: Tooltip.hideText()
-
-        Timer
-        {
-           interval: 1000
-           running: mouseArea1.containsMouse && tooltip.length
-           onTriggered: Tooltip.showText(mouseArea1, Qt.point(mouseArea1.mouseX, mouseArea1.mouseY), tooltip)
-        }
+        contentItem:
+            Text
+            {
+              text: tooltip
+              color: "white"
+          }
     }
+
+    contentItem:
+        Rectangle
+        {
+            color: "transparent"
+            Image
+            {
+                id: btnIcon
+                visible: imgSource ? true : false
+                anchors.centerIn: parent
+                width: Math.min(control.width - imgMargins, control.height - imgMargins)
+                height: width
+                source: imgSource
+                sourceSize: Qt.size(width, height)
+            }
+
+            Text
+            {
+                id: faIcon
+                visible: faSource ? true : false
+                anchors.centerIn: parent
+                color: faColor
+                font.family: "FontAwesome"
+                font.pixelSize: control.height - imgMargins
+                text: faSource
+            }
+        }
+
+    background:
+        Rectangle
+        {
+            id: contentBody
+            color: bgColor
+            radius: 5
+            border.color: "#1D1D1D"
+            border.width: 2
+
+            states: [
+                State
+                {
+                    when: checked
+                    PropertyChanges
+                    {
+                        target: contentBody
+                        color: checkedColor
+                    }
+                },
+                State
+                {
+                    when: ctrlMouseArea.pressed
+                    PropertyChanges
+                    {
+                        target: contentBody
+                        color: pressColor
+                    }
+                },
+                State
+                {
+                    when: hovered
+                    PropertyChanges
+                    {
+                        target: contentBody
+                        color: hoverColor
+                    }
+                }
+            ]
+
+            MouseArea
+            {
+                id: ctrlMouseArea
+                anchors.fill: parent
+                onClicked:
+                {
+                    if (checkable)
+                    {
+                        control.toggle()
+                        control.toggled()
+                    }
+                    else
+                        control.clicked()
+                }
+            }
+        }
+
 }
+

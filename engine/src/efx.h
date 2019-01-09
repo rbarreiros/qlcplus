@@ -78,48 +78,46 @@ class EFX : public Function
 
     friend class EFXFixture;
 
-    enum EFXAttr
-    {
-        Intensity = Function::Intensity,
-        Height,
-        Width,
-        Rotation,
-        XOffset,
-        YOffset
-    };
-
     /*********************************************************************
      * Initialization
      *********************************************************************/
 public:
+    enum EFXAttr
+    {
+        Intensity = Function::Intensity,
+        Width,
+        Height,
+        Rotation,
+        XOffset,
+        YOffset,
+        StartOffset
+    };
+
     EFX(Doc* doc);
     ~EFX();
+
+    /** @reimp */
+    QIcon getIcon() const;
 
     /*********************************************************************
      * Copying
      *********************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     Function* createCopy(Doc* doc, bool addToDoc = true);
 
     /** Copy the contents for this function from another function */
     bool copyFrom(const Function* function);
 
-    /** Set the duration in milliseconds */
-    virtual void setDuration(uint ms);
-
-    /*********************************************************************
-     * UI State
-     *********************************************************************/
-private:
-    virtual FunctionUiState * createUiState();
-
     /*********************************************************************
      * Contents
      *********************************************************************/
 public:
-    /** Get the EFX total duration in milliseconds */
-    quint32 totalDuration();
+    /** Set the duration in milliseconds */
+    virtual void setDuration(uint ms);
+
+signals:
+    void durationChanged(uint ms);
 
     /*********************************************************************
      * Algorithm
@@ -155,7 +153,7 @@ public:
 
     /**
      * Get a preview of the current algorithm. Puts 128 points to the
-     * given polygon, 255px wide and 255px high at maximum, that represent
+     * given polygon, 255px wide and 255px high at maximum, that represents
      * roughly the path of the pattern on a flat surface directly in front
      * of a moving (head/mirror) fixture.
      *
@@ -171,22 +169,22 @@ public:
      */
     void previewFixtures(QVector<QPolygonF> &polygons) const;
 
-private:
-
-    void preview(QPolygonF &polygon, Function::Direction direction, int startOffset) const;
-
     /**
      * Calculate a single point with the currently selected algorithm,
      * based on the value of iterator (which is basically a step number).
      *
      * @param direction Forward or Backward (input)
-     * @param startOffset 
+     * @param startOffset
      * @param iterator Step number (input)
      * @param x Used to store the calculated X coordinate (output)
      * @param y Used to store the calculated Y coordinate (output)
      */
     void calculatePoint(Function::Direction direction, int startOffset, float iterator, float* x, float* y) const;
- 
+
+private:
+
+    void preview(QPolygonF &polygon, Function::Direction direction, int startOffset) const;
+
     /**
      * Rotate a point of the pattern by rot degrees and scale the point
      * within w/h and xOff/yOff.
@@ -241,12 +239,6 @@ public:
      */
     int width() const;
 
-private:
-    /**
-     * Pattern width, see setWidth()
-     */
-    float m_width;
-
     /*********************************************************************
      * Height
      *********************************************************************/
@@ -264,12 +256,6 @@ public:
      * @return Pattern height (0-255)
      */
     int height() const;
-
-private:
-    /**
-     * Pattern height, see setHeight()
-     */
-    float m_height;
 
     /*********************************************************************
      * Rotation
@@ -330,14 +316,7 @@ public:
     int startOffset() const;
 
 private:
-
     float convertOffset(int offset) const;
-
-private:
-    /**
-     * Pattern start offset, see setStartOffset()
-     */
-    int m_startOffset;
 
     /*********************************************************************
      * IsRelative
@@ -394,17 +373,6 @@ public:
      * @return Pattern offset (0-255; 127 is middle)
      */
     int yOffset() const;
-
-private:
-    /**
-     * Pattern X offset, see setXOffset()
-     */
-    float m_xOffset;
-
-    /**
-     * Pattern Y offset, see setXOffset()
-     */
-    float m_yOffset;
 
     /*********************************************************************
      * Frequency
@@ -507,30 +475,38 @@ private:
      *********************************************************************/
 public:
     /** Add a new fixture to this EFX */
-    bool addFixture(EFXFixture* ef);
+    bool addFixture(EFXFixture *ef);
 
     /** Remove the designated fixture from this EFX but don't delete it */
-    bool removeFixture(EFXFixture* ef);
+    bool removeFixture(EFXFixture *ef);
+
+    bool removeFixture(quint32 fxi, int head);
 
     /** Remove all the fixtures from this EFX but don't delete them */
     void removeAllFixtures();
 
     /** Raise a fixture in the serial order to an earlier position */
-    bool raiseFixture(EFXFixture* ef);
+    bool raiseFixture(EFXFixture *ef);
 
     /** Lower a fixture in the serial order to a later position */
-    bool lowerFixture(EFXFixture* ef);
+    bool lowerFixture(EFXFixture *ef);
 
     /** Get a list of fixtures taking part in this EFX */
-    const QList <EFXFixture*> fixtures() const;
+    const QList <EFXFixture *> fixtures() const;
+
+    /** Get an EFXFixture reference from Fixture $id and &headIndex
+     *  Returns NULL on failure */
+    EFXFixture *fixture(quint32 id, int headIndex);
+
+    /** @reimp */
+    QList<quint32> components();
 
 public slots:
     /** Slot that captures Doc::fixtureRemoved signals */
     void slotFixtureRemoved(quint32 fxi_id);
 
 private:
-    QList <EFXFixture*> m_fixtures;
-    GenericFader* m_fader;
+    QList <EFXFixture *> m_fixtures;
 
     /*********************************************************************
      * Fixture propagation mode
@@ -581,21 +557,31 @@ private:
      * Running
      *********************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     void preRun(MasterTimer* timer);
 
-    /** @reimpl */
+    /** @reimp */
     void write(MasterTimer* timer, QList<Universe *> universes);
 
-    /** @reimpl */
+    /** @reimp */
     void postRun(MasterTimer* timer, QList<Universe*> universes);
+
+private:
+    GenericFader *getFader(QList<Universe *> universes, quint32 universeID);
 
     /*********************************************************************
      * Intensity
      *********************************************************************/
 public:
     /** @reimp */
-    void adjustAttribute(qreal fraction, int attributeIndex = 0);
+    int adjustAttribute(qreal fraction, int attributeId = 0);
+
+    /*************************************************************************
+     * Blend mode
+     *************************************************************************/
+public:
+    /** @reimp */
+    void setBlendMode(Universe::BlendMode mode);
 };
 
 /** @} */

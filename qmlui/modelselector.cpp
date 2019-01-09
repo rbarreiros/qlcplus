@@ -18,62 +18,54 @@
 */
 
 #include "modelselector.h"
+#include "listmodel.h"
 
 ModelSelector::ModelSelector(QObject *parent)
     : QObject(parent)
-    , m_nodesCount(0)
     , m_itemsCount(0)
 {
-
 }
 
 ModelSelector::~ModelSelector()
 {
-    m_selectedItems.clear();
+    m_selectedIndices.clear();
 }
 
-void ModelSelector::selectItem(quint32 id, QQuickItem *item, bool multiSelection)
+void ModelSelector::selectItem(quint32 index, ListModel *model, bool multiSelection)
 {
+    qDebug() << "select item with ID:" << index;
     if (multiSelection == false)
     {
-        foreach(selectedItem sf, m_selectedItems)
-            sf.m_item->setProperty("isSelected", false);
+        for (quint32 sidx : m_selectedIndices)
+        {
+            QModelIndex idx = model->index(int(sidx), 0, QModelIndex());
+            model->setDataWithRole(idx, "isSelected", false);
+        }
 
-        m_selectedItems.clear();
-        m_nodesCount = 0;
+        m_selectedIndices.clear();
         m_itemsCount = 0;
     }
 
-    selectedItem si;
-    si.m_ID = id;
-    si.m_item = item;
-    item->setProperty("isSelected", true);
-    m_selectedItems.append(si);
-    if ((int)id == -1)
-    {
-        m_nodesCount++;
-        emit nodesCountChanged(m_nodesCount);
-    }
-    else
-    {
-        m_itemsCount++;
-        emit itemsCountChanged(m_itemsCount);
-    }
+    QModelIndex idx = model->index(int(index), 0, QModelIndex());
+    model->setDataWithRole(idx, "isSelected", true);
+    m_selectedIndices.append(index);
+    m_itemsCount++;
+    emit itemsCountChanged(m_itemsCount);
 }
 
 QVariantList ModelSelector::itemsList()
 {
     QVariantList list;
-    foreach(selectedItem si, m_selectedItems)
-        if ((int)si.m_ID != -1)
-            list.append(si.m_ID);
+    for (quint32 sidx : m_selectedIndices)
+        list.append(sidx);
 
     return list;
 }
 
-int ModelSelector::nodesCount() const
+void ModelSelector::resetSelection()
 {
-    return m_nodesCount;
+    //qDebug() << "[ModelSelector] resetSelection";
+    m_selectedIndices.clear();
 }
 
 int ModelSelector::itemsCount() const

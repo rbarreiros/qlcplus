@@ -18,6 +18,7 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Controls 2.1
 
 Rectangle
 {
@@ -34,7 +35,14 @@ Rectangle
         objectName: "vcPage" + page
         anchors.fill: parent
         boundsBehavior: Flickable.StopAtBounds
+
+        MouseArea
+        {
+            anchors.fill: parent
+            onClicked: virtualConsole.resetWidgetSelection()
+        }
+
+        ScrollBar.vertical: CustomScrollBar { }
+        ScrollBar.horizontal : CustomScrollBar { orientation: Qt.Horizontal }
     }
-    ScrollBar { flickable: vcPage; doubleBars: true }
-    ScrollBar { orientation: Qt.Horizontal; flickable: vcPage }
 }

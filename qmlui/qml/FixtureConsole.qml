@@ -20,7 +20,7 @@
 import QtQuick 2.2
 import QtQuick.Layouts 1.0
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
 import "."
 
 Rectangle
@@ -33,7 +33,7 @@ Rectangle
     onWidthChanged: consoleRoot.sizeChanged(width, height)
     onHeightChanged:
     {
-        if (height < 80)
+        if (height < UISettings.iconSizeDefault * 3)
             fxColumn.visible = false
         else
             fxColumn.visible = true
@@ -46,6 +46,7 @@ Rectangle
     property bool isSelected: false
     property bool showEnablers: false
     property bool sceneConsole: false
+    property bool externalChange: false
 
     signal doubleClicked
     signal clicked
@@ -54,6 +55,7 @@ Rectangle
 
     onValuesChanged:
     {
+        externalChange = true
         for (var i = 0; i < values.length; i++)
         {
             //console.log("Value " + i + " = " + values[i]);
@@ -62,13 +64,22 @@ Rectangle
             else
                 channelsRpt.itemAt(i).dmxValue = (values[i] / 255) * 100
         }
+        externalChange = false
     }
 
     function setChannelValue(channel, value)
     {
         if (showEnablers == true)
             channelsRpt.itemAt(channel).isEnabled = true
+        externalChange = true
         channelsRpt.itemAt(channel).dmxValue = value
+        externalChange = false
+    }
+
+    function updateChannels()
+    {
+        for (var i = 0; i < channelsRpt.count; i++)
+            channelsRpt.itemAt(i).updateChannel()
     }
 
     Column
@@ -76,12 +87,13 @@ Rectangle
         id: fxColumn
         height: parent.height
         visible: false
+
         Rectangle
         {
             id: fxNameBar
-            color: "#111"
+            color: UISettings.bgStronger
             width: parent.width
-            height: 27
+            height: UISettings.listItemHeight
             clip: true
 
             RobotoText
@@ -89,14 +101,14 @@ Rectangle
                 anchors.verticalCenter: parent.verticalCenter
                 x: 2
                 label: fixtureObj ? fixtureObj.name : ""
-                fontSize: 17
+                fontSize: UISettings.textSizeDefault
             }
             DMXPercentageButton
             {
                 x: parent.width - width - 3
                 y: 1
                 z: 2
-                height: 25
+                height: parent.height - 2
                 dmxMode: dmxValues
                 onClicked:
                 {
@@ -137,54 +149,75 @@ Rectangle
                         color: "transparent"
                         border.width: 1
                         border.color: "#111"
-                        width: 40
+                        width: UISettings.iconSizeDefault
                         height: channelsRow.height
 
-                        property alias dmxValue: slider.value
+                        property alias dmxValue: chValueSpin.value
                         property bool dmxMode: true
                         property bool isEnabled: showEnablers ? false : true
 
+                        function updateChannel()
+                        {
+                            chIcon.source = fixtureObj ? fixtureManager.channelIcon(fixtureObj.id, index) : ""
+                            chIcon.tooltip = fixtureObj ? fixtureManager.channelName(fixtureObj.id, index) : ""
+                        }
+
                         onDmxValueChanged:
                         {
+                            if (externalChange == true)
+                                return
+
                             var val = dmxMode ? dmxValue : dmxValue * 2.55
                             if (sceneConsole == false)
                                 fixtureManager.setChannelValue(fixtureObj.id, index, val)
                             else
-                                sceneEditor.setChannelValue(fixtureObj.id, index, val)
+                                functionManager.setChannelValue(fixtureObj.id, index, val)
+
+                            consoleRoot.valueChanged(fixtureObj.id, index, val)
                         }
 
-                        // This is the black overlay to "emulate" a disabled channel
+                        // This is the black overlay to "simulate" a disabled channel
                         Rectangle
                         {
                             x: 1
-                            y: 16
+                            y: chIcon.y
                             z: 2
                             width: parent.width - 2
-                            height: chColumn.height - 16
+                            height: chDelegate.height - enableCheckBox.height
                             color: "black"
                             opacity: 0.7
                             visible: showEnablers ? !isEnabled : false
                         }
 
-                        ColumnLayout
+                        Rectangle
+                        {
+                            width: parent.width
+                            height: (showEnablers ? enableCheckBox.height : 0) + chIcon.height + 1
+                            color: UISettings.bgLight
+                        }
+
+                        Column
                         {
                             id: chColumn
                             x: 1
                             y: 1
                             width: parent.width - 2
+                            height: parent.height
                             spacing: 1
 
+                            // channel enable/disable
                             Rectangle
                             {
                                 id: enableCheckBox
-                                width: 34
-                                height: 15
+                                x: (parent.width - width) / 2
+                                width: UISettings.iconSizeMedium
+                                height: UISettings.iconSizeMedium / 2
                                 radius: 2
                                 visible: showEnablers
-                                color: isEnabled ? UISettings.highlight : UISettings.bgMedium
+                                color: isEnabled ? UISettings.highlight : UISettings.bgLight
                                 border.width: 1
-                                border.color: isEnabled ? "white" : "#555"
-                                Layout.alignment: Qt.AlignCenter
+                                border.color: isEnabled ? "white" : UISettings.bgLighter
+                                //Layout.alignment: Qt.AlignCenter
 
                                 MouseArea
                                 {
@@ -195,7 +228,7 @@ Rectangle
                                         if (sceneConsole == true)
                                         {
                                             if (isEnabled == true)
-                                                sceneEditor.setChannelValue(fixtureObj.id, index, 0)
+                                                functionManager.setChannelValue(fixtureObj.id, index, dmxMode ? dmxValue : dmxValue * 2.55)
                                             else
                                                 sceneEditor.unsetChannel(fixtureObj.id, index)
                                         }
@@ -203,47 +236,56 @@ Rectangle
                                 }
                             }
 
-                            Image
+                            // channel icon
+                            IconButton
                             {
-                                width: 32
-                                height: 32
-                                Layout.alignment: Qt.AlignCenter
-                                sourceSize: Qt.size(width, height)
-                                source: fixtureObj ? fixtureManager.channelIcon(fixtureObj.id, index) : ""
+                                id: chIcon
+                                x: (parent.width - width) / 2
+                                width: UISettings.iconSizeMedium
+                                height: width
+                                border.width: 0
+                                tooltip: fixtureObj ? fixtureManager.channelName(fixtureObj.id, index) : ""
+                                imgSource: fixtureObj ? fixtureManager.channelIcon(fixtureObj.id, index) : ""
                             }
+
+                            // channel fader
                             QLCPlusFader
                             {
                                 id: slider
-                                width: 32
-                                Layout.preferredHeight:
-                                    chDelegate.height ? chDelegate.height - 32 - 25 - (showEnablers ? 15 : 0) - 4 : 0
-                                Layout.alignment: Qt.AlignCenter
-                                minimumValue: 0
-                                maximumValue: dmxMode ? 255 : 100
+                                x: (parent.width - width) / 2
+                                width: parent.width * 0.95
+                                height: chDelegate.height - (showEnablers ? enableCheckBox.height : 0) - chIcon.height - chValueSpin.height
+                                from: 0
+                                to: dmxMode ? 255 : 100
+                                value: dmxValue
                                 enabled: showEnablers ? isEnabled : true
+                                onPositionChanged: dmxValue = valueAt(position)
 
                                 Component.onCompleted:
                                 {
                                     if (sceneConsole)
                                     {
-                                        if (sceneEditor.hasChannel(fixtureObj.id, index) === true)
-                                        {
-                                            if (showEnablers)
-                                                isEnabled = true
-                                            slider.value = sceneEditor.channelValue(fixtureObj.id, index)
-                                        }
+                                        if (showEnablers && sceneEditor.hasChannel(fixtureObj.id, index) === true)
+                                            isEnabled = true
+
+                                        dmxValue = sceneEditor.channelValue(fixtureObj.id, index)
                                     }
                                 }
                             }
+
+                            // channel value
                             CustomSpinBox
                             {
-                                width: 38
-                                height: 25
-                                minimumValue: 0
-                                maximumValue: dmxMode ? 255 : 100
+                                id: chValueSpin
+                                width: parent.width
+                                height: UISettings.listItemHeight * 0.75
+                                from: 0
+                                to: dmxMode ? 255 : 100
+                                suffix: dmxMode ? "" : "%"
                                 showControls: false
-                                value: slider.value
-                                onValueChanged: dmxValue = value
+                                padding: 0
+                                horizontalAlignment: Qt.AlignHCenter
+                                onValueModified: dmxValue = value
                             }
                         }
                     }

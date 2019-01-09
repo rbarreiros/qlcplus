@@ -90,7 +90,7 @@ public:
      */
     QString normalizeComponentPath(const QString& filePath) const;
 
-    /** If filePath is relative path, it is resolved relative to the workspace 
+    /** If filePath is relative path, it is resolved relative to the workspace
      *  directory (absolute path is returned).
      *  If filePath is absolute, it is returned unchanged (symlinks and .. are resolved).
      *
@@ -119,25 +119,31 @@ signals:
      *********************************************************************/
 public:
     /** Get the fixture definition cache object */
-    QLCFixtureDefCache* fixtureDefCache() const;
+    QLCFixtureDefCache *fixtureDefCache() const;
+
+    /** Set the fixure definition cache reference. This is useful
+     *  to share a cache between different Docs.
+     *  Note: deletion of an existing cache must be performed before calling
+     *        this method, otherwise it creates a memory leak */
+    void setFixtureDefinitionCache(QLCFixtureDefCache *cache);
 
     /** Get the channel modifiers cache object */
-    QLCModifiersCache* modifiersCache() const;
+    QLCModifiersCache *modifiersCache() const;
 
     /** Get the RGB scripts cache object */
-    RGBScriptsCache* rgbScriptsCache() const;
+    RGBScriptsCache *rgbScriptsCache() const;
 
     /** Get the I/O plugin cache object */
-    IOPluginCache* ioPluginCache() const;
+    IOPluginCache *ioPluginCache() const;
 
     /** Get the audio decoder plugin cache object */
-    AudioPluginCache* audioPluginCache() const;
+    AudioPluginCache *audioPluginCache() const;
 
     /** Get the DMX output map object */
-    InputOutputMap* inputOutputMap() const;
+    InputOutputMap *inputOutputMap() const;
 
     /** Get the MasterTimer object that runs the show */
-    MasterTimer* masterTimer() const;
+    MasterTimer *masterTimer() const;
 
     /** Get the audio input capture object */
     QSharedPointer<AudioCapture> audioInputCapture();
@@ -151,8 +157,8 @@ private:
     RGBScriptsCache *m_rgbScriptsCache;
     IOPluginCache *m_ioPluginCache;
     AudioPluginCache *m_audioPluginCache;
-    InputOutputMap *m_ioMap;
     MasterTimer *m_masterTimer;
+    InputOutputMap *m_ioMap;
     QSharedPointer<AudioCapture> m_inputCapture;
     MonitorProperties *m_monitorProps;
 
@@ -194,19 +200,23 @@ protected:
      * Modified status
      *********************************************************************/
 public:
-    /**
-     * Check, whether Doc has been modified (and is in need of saving)
-     */
+    enum LoadStatus
+    {
+        Cleared = 0,
+        Loading,
+        Loaded
+    };
+
+    /** Get the current Doc load status */
+    LoadStatus loadStatus() const;
+
+    /** Check, whether Doc has been modified (and is in need of saving) */
     bool isModified() const;
 
-    /**
-     * Set Doc into modified state (i.e. it is in need of saving)
-     */
+    /** Set Doc into modified state (i.e. it is in need of saving) */
     void setModified();
 
-    /**
-     * Reset Doc's modified state (i.e. it is no longer in need of saving)
-     */
+    /** Reset Doc's modified state (i.e. it is no longer in need of saving) */
     void resetModified();
 
 signals:
@@ -214,7 +224,8 @@ signals:
     void modified(bool state);
 
 protected:
-    /** Modified status (true; needs saving, false; does not) */
+    /** The current Doc load status */
+    LoadStatus m_loadStatus;
     bool m_modified;
 
     /*********************************************************************
@@ -280,7 +291,7 @@ public:
     Fixture* fixture(quint32 id) const;
 
     /**
-     * Get a list of fixtures
+     * Get a list of fixtures ordered by ID
      */
     QList<Fixture*> const& fixtures() const;
 
@@ -376,7 +387,7 @@ private:
     quint32 m_latestFixtureGroupId;
 
     /*********************************************************************
-     * Channels groups
+     * Channel groups
      *********************************************************************/
 public:
     /** Add a new channels group. Doc takes ownership of the group. */
@@ -486,6 +497,15 @@ public:
      */
     quint32 startupFunction();
 
+    /**
+     * Find the usage of a Function with the specified $fid
+     * within Doc
+     *
+     * @param fid the Function ID to look up for
+     * @return a list of Function IDs and, if available, the step position
+     */
+    QList<quint32> getUsage(quint32 fid);
+
 protected:
     /**
      * Create a new function Id
@@ -538,11 +558,6 @@ protected:
 public:
     /** Returns a reference to the monitor properties instance */
     MonitorProperties *monitorProperties();
-
-    /** Returns the first available space (in mm) for a rectangle
-     * of the given width and height.
-     * This method works with the monitor properties and the fixtures list */
-    QPointF getAvailable2DPosition(QRectF& fxRect);
 
     /*********************************************************************
      * Load & Save

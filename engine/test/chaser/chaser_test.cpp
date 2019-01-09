@@ -68,7 +68,7 @@ void Chaser_Test::cleanup()
 void Chaser_Test::initial()
 {
     Chaser c(m_doc);
-    QVERIFY(c.type() == Function::Chaser);
+    QVERIFY(c.type() == Function::ChaserType);
     QVERIFY(c.name() == "New Chaser");
     QVERIFY(c.steps().size() == 0);
     QVERIFY(c.direction() == Chaser::Forward);
@@ -183,26 +183,35 @@ void Chaser_Test::steps()
     QVERIFY(c.steps().size() == 2);
     QVERIFY(c.steps().at(0) == ChaserStep(2));
     QVERIFY(c.steps().at(1) == ChaserStep(1));
+
+    /* Move an invalid step will fail */
+    QVERIFY(c.moveStep(5, 1) == false);
+
+    QVERIFY(c.moveStep(1, 0) == true);
+    QVERIFY(c.steps().size() == 2);
+    QVERIFY(c.steps().at(0) == ChaserStep(1));
+    QVERIFY(c.steps().at(1) == ChaserStep(2));
 }
 
-void Chaser_Test::clear()
+void Chaser_Test::stepAt()
 {
     Chaser c(m_doc);
-    c.setID(50);
-    QCOMPARE(c.steps().size(), 0);
+    c.setID(42);
+    QVERIFY(c.addStep(ChaserStep(0, 1000, 5000, 0)) == true);
+    QVERIFY(c.stepsCount() == 1);
 
-    c.addStep(ChaserStep(0));
-    c.addStep(ChaserStep(1));
-    c.addStep(ChaserStep(2));
-    c.addStep(ChaserStep(470));
-    QCOMPARE(c.steps().size(), 4);
+    QVERIFY(c.stepAt(10) == NULL);
+    ChaserStep *cs = c.stepAt(0);
+    QVERIFY(cs != NULL);
 
-    QSignalSpy spy(&c, SIGNAL(changed(quint32)));
-    c.clear();
-    QCOMPARE(c.steps().size(), 0);
-    QCOMPARE(spy.size(), 1);
-    QCOMPARE(spy.at(0).size(), 1);
-    QCOMPARE(spy.at(0).at(0).toUInt(), quint32(50));
+    QVERIFY(cs->fadeIn == 1000);
+    QVERIFY(cs->hold == 5000);
+
+    cs->fadeIn = 500;
+    cs->hold = 8000;
+
+    QVERIFY(cs->fadeIn == 500);
+    QVERIFY(cs->hold == 8000);
 }
 
 void Chaser_Test::functionRemoval()
@@ -844,11 +853,11 @@ void Chaser_Test::tap()
     QVERIFY(c->m_runner != NULL);
     QCOMPARE(c->duration(), uint(0));
     c->write(m_doc->masterTimer(), QList<Universe*>());
-    QCOMPARE(c->m_runner->m_next, false);
+    QCOMPARE(c->m_runner->m_pendingAction.m_action, ChaserNoAction);
     c->tap();
     QTest::qWait(MasterTimer::tick());
     c->tap();
-    QCOMPARE(c->m_runner->m_next, true);
+    QCOMPARE(c->m_runner->m_pendingAction.m_action, ChaserNextStep);
 }
 
 void Chaser_Test::preRun()
@@ -945,13 +954,13 @@ void Chaser_Test::adjustIntensity()
 
     c->preRun(&timer);
     c->adjustAttribute(0.5, Function::Intensity);
-    QCOMPARE(c->m_runner->m_intensity, qreal(0.5));
+    QCOMPARE(c->m_runner->m_pendingAction.m_intensity, qreal(0.5));
     c->adjustAttribute(0.8, Function::Intensity);
-    QCOMPARE(c->m_runner->m_intensity, qreal(0.8));
+    QCOMPARE(c->m_runner->m_pendingAction.m_intensity, qreal(0.8));
     c->adjustAttribute(1.5, Function::Intensity);
-    QCOMPARE(c->m_runner->m_intensity, qreal(1.0));
+    QCOMPARE(c->m_runner->m_pendingAction.m_intensity, qreal(1.0));
     c->adjustAttribute(-0.1, Function::Intensity);
-    QCOMPARE(c->m_runner->m_intensity, qreal(0.0));
+    QCOMPARE(c->m_runner->m_pendingAction.m_intensity, qreal(0.0));
     c->postRun(&timer, ua);
 
     // Mustn't crash after postRun

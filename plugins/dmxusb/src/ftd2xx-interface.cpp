@@ -157,7 +157,6 @@ QString FTD2XXInterface::typeString()
 QList<DMXInterface *> FTD2XXInterface::interfaces(QList<DMXInterface *> discoveredList)
 {
     QList <DMXInterface*> interfacesList;
-    int id = 0;
 
     /* Find out the number of FTDI devices present */
     DWORD num = 0;
@@ -174,6 +173,8 @@ QList<DMXInterface *> FTD2XXInterface::interfaces(QList<DMXInterface *> discover
     // Get the device information list
     if (FT_GetDeviceInfoList(devInfo, &num) == FT_OK)
     {
+        int id = 0;
+
         for (DWORD i = 0; i < num; i++)
         {
             QString vendor, name, serial;
@@ -181,12 +182,12 @@ QList<DMXInterface *> FTD2XXInterface::interfaces(QList<DMXInterface *> discover
             FT_STATUS s = get_interface_info(i, vendor, name, serial, VID, PID);
             if (s != FT_OK || name.isEmpty() || serial.isEmpty())
             {
-				// Seems that some otherwise working devices don't provide
+                // Seems that some otherwise working devices don't provide
                 // FT_PROGRAM_DATA struct used by get_interface_info().
                 name = QString(devInfo[i].Description);
-				serial = QString(devInfo[i].SerialNumber);
-				vendor = QString();
-			}
+                serial = QString(devInfo[i].SerialNumber);
+                vendor = QString();
+            }
 
             qDebug() << "serial: " << serial << "name:" << name << "vendor:" << vendor;
 
@@ -403,7 +404,7 @@ QByteArray FTD2XXInterface::read(int size, uchar* userBuffer)
     }
     else
     {
-        array = QByteArray::fromRawData((char*) buffer, read);
+        array = QByteArray((char*) buffer, read);
     }
 
     if (userBuffer == NULL)
@@ -414,36 +415,27 @@ QByteArray FTD2XXInterface::read(int size, uchar* userBuffer)
 
 uchar FTD2XXInterface::readByte(bool* ok)
 {
+    if (ok) *ok = false;
+
     if (m_handle == NULL)
-    {
-        *ok = false;
         return 0;
-    }
 
     DWORD RxBytes, TxBytes, event;
     FT_GetStatus(m_handle, &RxBytes, &TxBytes, &event);
 
     if (RxBytes < 1)
-    {
-        *ok = false;
         return 0;
-    }
 
     uchar byte = 0;
     int read = 0;
     FT_Read(m_handle, &byte, 1, (LPDWORD) &read);
     if (read == 1)
     {
-        if (ok)
-            *ok = true;
+        if (ok) *ok = true;
         return byte;
     }
-    else
-    {
-        if (ok)
-            *ok = false;
-        return 0;
-    }
+
+    return 0;
 }
 
 

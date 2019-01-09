@@ -18,7 +18,7 @@
 */
 
 import QtQuick 2.0
-import QtQuick.Controls 1.0
+import QtQuick.Controls 2.1
 
 import "."
 
@@ -38,8 +38,9 @@ SidePanel
     {
         if (isOpen == true)
         {
-            viewLoader.source = ""
-            viewLoader.source = Qt.binding(function() { return loaderSource })
+            var tmpSource = loaderSource
+            loaderSource = ""
+            loaderSource = tmpSource
         }
     }
 
@@ -64,7 +65,7 @@ SidePanel
             anchors.leftMargin: 1
             spacing: 3
 
-            ExclusiveGroup { id: ioInputGroup }
+            ButtonGroup { id: ioInputGroup }
 
             IconButton
             {
@@ -75,7 +76,7 @@ SidePanel
                 height: iconSize
                 imgSource: "qrc:/audiocard.svg"
                 checkable: true
-                exclusiveGroup: ioInputGroup
+                ButtonGroup.group: ioInputGroup
                 tooltip: qsTr("Show the audio input sources")
                 onToggled:
                 {
@@ -94,7 +95,7 @@ SidePanel
                 height: iconSize
                 imgSource: "qrc:/inputoutput.svg"
                 checkable: true
-                exclusiveGroup: ioInputGroup
+                ButtonGroup.group: ioInputGroup
                 tooltip: qsTr("Show the universe input sources")
                 onToggled:
                 {
@@ -113,7 +114,7 @@ SidePanel
                 height: iconSize
                 imgSource: ""
                 checkable: true
-                exclusiveGroup: ioInputGroup
+                ButtonGroup.group: ioInputGroup
                 tooltip: qsTr("Show the universe input profiles")
                 onToggled:
                 {
@@ -126,9 +127,21 @@ SidePanel
                 {
                     anchors.centerIn: parent
                     label: "P"
-                    fontSize: 18
+                    fontSize: UISettings.textSizeDefault * 1.1
                     fontBold: true
                 }
+            }
+
+            IconButton
+            {
+                id: inputConfigureButton
+                z: 2
+                visible: ioManager.inputCanConfigure
+                width: iconSize
+                height: iconSize
+                imgSource: "qrc:/configure.svg"
+                tooltip: qsTr("Open the plugin configuration")
+                onClicked: ioManager.configurePlugin(true)
             }
         }
     }

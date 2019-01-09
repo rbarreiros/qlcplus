@@ -18,31 +18,65 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Controls 2.1
 
-Flickable
+import "."
+
+Rectangle
 {
-    id: fixtureDMXView
+    id: dmxViewRoot
     anchors.fill: parent
-    anchors.margins: 20
+    color: UISettings.bgMain
 
-    contentHeight: flowLayout.height
-    contentWidth: flowLayout.width
-
-    property string contextName: "DMX"
-
-    Component.onCompleted: contextManager.enableContext("DMX", true)
-    Component.onDestruction: contextManager.enableContext("DMX", false)
+    property alias contextItem: flowLayout
+    property int viewMargin: 20
 
     function hasSettings()
     {
-        return false;
+        return true
     }
 
-    Flow
+    function showSettings(show)
     {
-        id: flowLayout
-        objectName: "DMXFlowView"
-        spacing: 5
-        width: parent.width
+        dmxSettings.visible = show
+    }
+
+    Flickable
+    {
+        id: fixtureDMXView
+        anchors.fill: parent
+        anchors.leftMargin: viewMargin
+        anchors.topMargin: viewMargin
+        //anchors.bottomMargin: viewMargin
+
+        contentHeight: flowLayout.height
+        contentWidth: flowLayout.width
+        interactive: false
+
+        boundsBehavior: Flickable.StopAtBounds
+
+        property string contextName: "DMX"
+
+        Flow
+        {
+            id: flowLayout
+            objectName: "DMXFlowView"
+            spacing: 5
+            width: dmxViewRoot.width - viewMargin
+
+            Component.onCompleted: contextManager.enableContext("DMX", true, flowLayout)
+            Component.onDestruction: if(contextManager) contextManager.enableContext("DMX", false, flowLayout)
+        }
+
+        ScrollBar.vertical: CustomScrollBar { }
+        ScrollBar.horizontal : CustomScrollBar { orientation: Qt.Horizontal }
+    }
+
+    SettingsViewDMX
+    {
+        id: dmxSettings
+        visible: false
+        x: parent.width - width
+        z: 5
     }
 }

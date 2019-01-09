@@ -1,12 +1,13 @@
 #
-# QLC+ documentation PDF creation through wkhtmltopdf utility downloaded from:
-#
-# https://code.google.com/p/wkhtmltopdf/downloads/detail?name=wkhtmltopdf-0.11.0_rc1-static-i386.tar.bz2
-#
-# and copied in /usr/bin
+# QLC+ documentation PDF creation through wkhtmltopdf utility downloaded from
+# https://wkhtmltopdf.org/downloads.html
 #
 
-wkhtmltopdf-amd64 --footer-center "Page [page]" --image-quality 100 \
+WKHTMLTOPDF=$(which wkhtmltopdf)
+
+cd $1
+
+$WKHTMLTOPDF --footer-center "Page [page]" --image-quality 100 --javascript-delay 1000 \
   pdf_cover.html \
   index_pdf.html \
   concept.html \
@@ -71,12 +72,7 @@ wkhtmltopdf-amd64 --footer-center "Page [page]" --image-quality 100 \
   vellemanoutput.html \
   loopbackplugin.html \
   fixturedefinitioneditor.html \
-  capabilityeditor.html \
-  capabilitywizard.html \
-  channeleditor.html \
-  fixtureeditor.html \
   modeeditor.html \
-  headeditor.html \
   tutorial.html \
   tutorial-multipage.html \
   tutorial-soundcontrol.html \
@@ -84,6 +80,10 @@ wkhtmltopdf-amd64 --footer-center "Page [page]" --image-quality 100 \
   commandlineparameters.html \
   kioskmode.html \
   webinterface.html \
+  disable_apple_ftdi_driver.html \
   parameterstuning.html \
   guicustomstyles.html \
   QLC+.pdf
+
+cd -
+mv $1/QLC+.pdf QLC+_manual_$1.pdf

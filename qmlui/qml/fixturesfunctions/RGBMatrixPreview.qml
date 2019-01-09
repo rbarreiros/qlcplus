@@ -19,6 +19,8 @@
 
 import QtQuick 2.0
 
+import "."
+
 Rectangle
 {
     id: matrixBox
@@ -45,6 +47,7 @@ Rectangle
         x: 0
         y: 0
         z: 0
+        contextType: "2d"
 
         property int cellSize
 
@@ -68,17 +71,17 @@ Rectangle
 
         onPaint:
         {
-            var ctx = matrix.getContext('2d')
-            ctx.globalAlpha = 1.0
-            ctx.strokeStyle = "#3A3A3A"
-            ctx.fillStyle = "black"
-            ctx.lineWidth = 1
+            context.globalAlpha = 1.0
+            context.strokeStyle = UISettings.bgLight
+            context.fillStyle = "black"
+            context.lineWidth = 1
 
-            ctx.clearRect(0, 0, width, height)
-            ctx.fillRect(0, 0, width, height)
+            context.clearRect(0, 0, width, height)
+            context.fillRect(0, 0, width, height)
 
             var yPos = 0
             var xPos = 0
+            var twoPi = Math.PI * 2
 
             for (var yp = 0; yp < matrixSize.height; yp++)
             {
@@ -102,20 +105,20 @@ Rectangle
                         continue
                     }
 
-                    ctx.fillStyle = col
+                    context.fillStyle = col
 
                     if (matrixBox.circleItems)
                     {
-                        ctx.beginPath()
-                        ctx.arc(xPos, yPos, cellSize / 2, 0, 6.28, false)
-                        ctx.fill()
-                        ctx.stroke()
-                        ctx.closePath()
+                        context.beginPath()
+                        context.arc(xPos, yPos, cellSize / 2, 0, twoPi, false)
+                        context.fill()
+                        context.stroke()
+                        context.closePath()
                     }
                     else
                     {
-                        ctx.fillRect(xPos, yPos, cellSize, cellSize)
-                        ctx.strokeRect(xPos, yPos, cellSize, cellSize)
+                        context.fillRect(xPos, yPos, cellSize, cellSize)
+                        context.strokeRect(xPos, yPos, cellSize, cellSize)
                     }
 
                     xPos += cellSize

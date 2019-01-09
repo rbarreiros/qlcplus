@@ -71,6 +71,15 @@ void QLCChannel_Test::group()
     delete channel;
 }
 
+void QLCChannel_Test::defaultValue()
+{
+    QLCChannel* channel = new QLCChannel();
+    QVERIFY(channel->defaultValue() == 0);
+
+    channel->setDefaultValue(137);
+    QVERIFY(channel->defaultValue() == 137);
+}
+
 void QLCChannel_Test::controlByte()
 {
     QCOMPARE(int(QLCChannel::MSB), 0);
@@ -90,7 +99,7 @@ void QLCChannel_Test::colourList()
     QStringList list(QLCChannel::colourList());
 
     QCOMPARE(list.size(), 11);
-    QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::NoColour)));
+    //QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::NoColour)));
     QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::Red)));
     QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::Green)));
     QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::Blue)));
@@ -101,6 +110,7 @@ void QLCChannel_Test::colourList()
     QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::White)));
     QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::UV)));
     QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::Lime)));
+    QVERIFY(list.contains(QLCChannel::colourToString(QLCChannel::Indigo)));
 }
 
 void QLCChannel_Test::colour()
@@ -116,13 +126,14 @@ void QLCChannel_Test::colour()
     QCOMPARE(int(QLCChannel::White), 0xFFFFFF);
     QCOMPARE(int(QLCChannel::UV), 0x9400D3);
     QCOMPARE(int(QLCChannel::Lime), 0xADFF2F);
+    QCOMPARE(int(QLCChannel::Indigo), 0x4B0082);
 
     QLCChannel* channel = new QLCChannel();
     QCOMPARE(channel->colour(), QLCChannel::NoColour);
 
     channel->setColour(QLCChannel::Red);
     QCOMPARE(channel->colour(), QLCChannel::Red);
-    
+
     channel->setColour(QLCChannel::Green);
     QCOMPARE(channel->colour(), QLCChannel::Green);
 
@@ -149,6 +160,9 @@ void QLCChannel_Test::colour()
 
     channel->setColour(QLCChannel::Lime);
     QCOMPARE(channel->colour(), QLCChannel::Lime);
+
+    channel->setColour(QLCChannel::Indigo);
+    QCOMPARE(channel->colour(), QLCChannel::Indigo);
 
     channel->setColour(QLCChannel::NoColour);
     QCOMPARE(channel->colour(), QLCChannel::NoColour);
@@ -391,7 +405,7 @@ void QLCChannel_Test::copy()
     QVERIFY(channel->addCapability(cap8) == true);
 
     /* Create a copy of the original channel */
-    QLCChannel* copy = new QLCChannel(channel);
+    QLCChannel* copy = channel->createCopy();
 
     QVERIFY(copy->name() == "Foobar");
     QVERIFY(copy->group() == QLCChannel::Tilt);

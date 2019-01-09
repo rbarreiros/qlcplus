@@ -2,27 +2,22 @@ include(variables.pri)
 
 TEMPLATE = subdirs
 
-android: CONFIG += qmlui
-ios: CONFIG += qmlui
+SUBDIRS        += hotplugmonitor
+SUBDIRS        += engine
 
-SUBDIRS      += hotplugmonitor
-SUBDIRS      += engine
-
-contains(CONFIG, qmlui) {
+qmlui: {
   message("Building QLC+ 5 QML UI")
   SUBDIRS      += qmlui
-}
-else {
+} else {
   message("Building QLC+ 4 QtWidget UI")
   SUBDIRS      += ui
   SUBDIRS      += webaccess
   SUBDIRS      += main
+  SUBDIRS      += fixtureeditor
+  macx:SUBDIRS += launcher
 }
-SUBDIRS          += resources
-!android:!ios:SUBDIRS += fixtureeditor
-SUBDIRS          += etc
-macx:SUBDIRS     += launcher
-SUBDIRS          += plugins
+SUBDIRS        += resources
+SUBDIRS        += plugins
 
 unix:!macx:DEBIAN_CLEAN    += debian/*.substvars debian/*.log debian/*.debhelper
 unix:!macx:DEBIAN_CLEAN    += debian/files debian/dirs
@@ -44,12 +39,24 @@ win32:coverage.commands = @echo Get a better OS.
 # Translations (update these also in translate.sh)
 translations.target = translate
 QMAKE_EXTRA_TARGETS += translations
-translations.commands += ./translate.sh
+qmlui: {
+  translations.commands += ./translate.sh "qmlui"
+} else {
+  translations.commands += ./translate.sh "ui"
+}
 translations.files = ./qlcplus_de_DE.qm ./qlcplus_es_ES.qm ./qlcplus_fr_FR.qm
-translations.files += ./qlcplus_it_IT.qm ./qlcplus_nl_NL.qm ./qlcplus_cz_CZ.qm
-translations.files += ./qlcplus_pt_BR.qm ./qlcplus_ca_ES.qm ./qlcplus_ja_JP.qm
-translations.path   = $$INSTALLROOT/$$TRANSLATIONDIR
+translations.files += ./qlcplus_it_IT.qm ./qlcplus_nl_NL.qm ./qlcplus_ca_ES.qm ./qlcplus_ja_JP.qm
+qmlui: {
+  translations.files += ./qlcplus_ru_RU.qm ./qlcplus_uk_UA.qm
+} else {
+  translations.files += ./qlcplus_cz_CZ.qm ./qlcplus_pt_BR.qm 
+}
+appimage: {
+  translations.path   = $$TARGET_DIR/$$INSTALLROOT/$$TRANSLATIONDIR
+} else {
+  translations.path   = $$INSTALLROOT/$$TRANSLATIONDIR
+}
 INSTALLS           += translations
 
 # Leave this on the last row of this file
-macx:SUBDIRS += macx
+SUBDIRS += platforms

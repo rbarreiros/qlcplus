@@ -18,259 +18,425 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Layouts 1.0
+
+import org.qlcplus.classes 1.0
+import "TimeUtils.js" as TimeUtils
+
 import "."
 
-Column
+GridLayout
 {
-    property color bgCol: "#2D3492"
-    property int btnFontSize: 12
+    id: toolRoot
+    columns: 5
+    rows: 4
+    columnSpacing: 0
+    rowSpacing: 0
 
-    // top row: close, increase values
-    Row
+    property color buttonsBgColor: "#05438E"
+    property int btnFontSize: UISettings.textSizeDefault
+    property string title
+    property string timeValueString
+
+    property int timeValue: 0
+
+    /* The TAP time counter */
+    property double tapTimeValue: 0
+
+    /* If needed, this property can be used to recognize which type
+       of speed value is being edited */
+    property int speedType
+
+    /* The type of the tempo being edited. Can be Time or Beats */
+    property int tempoType: QLCFunction.Time
+    property int allowFractions: QLCFunction.NoFractions
+    property int currentFraction: 0
+
+    /* If needed, this can be the reference index of an item in a list */
+    property int indexInList
+
+    signal valueChanged(int val)
+    signal tabPressed(bool forward)
+    signal closed()
+
+    function show(tX, tY, tTitle, tStrValue, tType)
     {
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
+        tapTimeValue = 0
+        tapTimer.stop()
+        title = tTitle
+        speedType = tType
+        timeValueString = tStrValue
+        timeValue = TimeUtils.qlcStringToTime(timeValueString, tempoType)
+        if (allowFractions !== QLCFunction.NoFractions)
+            currentFraction = (timeValue % 1000)
 
-            Text
-            {
-                id: faIcon
-                anchors.centerIn: parent
-                color: "white"
-                font.family: "FontAwesome"
-                font.pointSize: btnFontSize
-                text: FontAwesome.fa_times
-            }
+        if (tX >= 0)
+            x = tX
+        if (tY >= 0)
+        {
+            y = tY
+            if (y + height > mainView.height)
+                y = mainView.height - height - UISettings.listItemHeight
         }
 
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
+        visible = true
+        timeBox.selectAndFocus()
+    }
 
-            RobotoText
-            {
-                anchors.centerIn: parent
-                label: "+H"
-                fontSize: btnFontSize
-            }
+    function updateTime(value, string)
+    {
+        if (value !== -1 && value !== timeValue)
+        {
+            timeValue = value
+            timeValueString = TimeUtils.timeToQlcString(timeValue, tempoType)
+            toolRoot.valueChanged(timeValue)
         }
-        Rectangle
+        if (string !== "" && string !== timeValueString)
         {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
-
-            RobotoText
-            {
-                anchors.centerIn: parent
-                label: "+M"
-                fontSize: btnFontSize
-            }
+            timeValue = TimeUtils.qlcStringToTime(string, tempoType)
+            timeValueString = TimeUtils.timeToQlcString(timeValue, tempoType)
+            toolRoot.valueChanged(timeValue)
         }
+    }
 
-        Rectangle
+    Timer
+    {
+        id: tapTimer
+        repeat: true
+        running: false
+        interval: 500
+
+        onTriggered:
         {
-            width: 40
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
-
-            RobotoText
-            {
-                anchors.centerIn: parent
-                label: "+S"
-                fontSize: btnFontSize
-            }
+            if (tapButton.border.color == UISettings.bgMedium)
+                tapButton.border.color = "#00FF00"
+            else
+                tapButton.border.color = UISettings.bgMedium
         }
+    }
 
-        Rectangle
-        {
-            width: 40
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
-
-            RobotoText
+    // title bar + close button
+    Rectangle
+    {
+        height: UISettings.iconSizeDefault
+        Layout.fillWidth: true
+        Layout.columnSpan: 5
+        gradient:
+            Gradient
             {
-                anchors.centerIn: parent
-                label: "+ms"
-                fontSize: btnFontSize
+                GradientStop { position: 0; color: UISettings.toolbarStartSub }
+                GradientStop { position: 1; color: UISettings.toolbarEnd }
+            }
+
+        RobotoText
+        {
+            id: titleBox
+            anchors.fill: parent
+            anchors.margins: 3
+
+            label: title
+            fontSize: UISettings.textSizeDefault * 0.75
+        }
+        // allow the tool to be dragged around
+        // by holding it on the title bar
+        MouseArea
+        {
+            anchors.fill: parent
+            drag.target: toolRoot
+        }
+        GenericButton
+        {
+            width: height
+            height: parent.height
+            anchors.right: parent.right
+            border.color: UISettings.bgMedium
+            //bgColor: buttonsBgColor
+            useFontawesome: true
+            label: FontAwesome.fa_times
+
+            onClicked:
+            {
+                tapTimer.stop()
+                toolRoot.visible = false
+                toolRoot.closed()
             }
         }
     }
 
-    // middle row: tap, values
-    Row
+    // top row: tap, increase values
+    GenericButton
     {
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
+        id: tapButton
+        width: UISettings.iconSizeDefault
+        Layout.fillHeight: true
+        Layout.rowSpan: 2
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: qsTr("Tap")
 
-            RobotoText
+        onClicked:
+        {
+            /* right click resets the current TAP time */
+            if (mouseButton === Qt.RightButton)
             {
-                anchors.centerIn: parent
-                label: "Tap"
-                fontSize: btnFontSize
+                tapTimer.stop()
+                tapButton.border.color = UISettings.bgMedium
+                tapTimeValue = 0
+            }
+            else
+            {
+                var currTime = new Date().getTime()
+                if (tapTimeValue != 0)
+                {
+                    updateTime(currTime - tapTimeValue, "")
+                    tapTimer.interval = timeValue
+                    tapTimer.restart()
+                }
+                tapTimeValue = currTime
             }
         }
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: "#444"
-            border.width: 1
-            border.color: "#333"
+    }
 
-            CustomTextEdit
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Time
+        width: height
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "+M"
+        repetition: true
+        onClicked: updateTime(timeValue + (60 * 1000), "")
+    }
+
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Time
+        width: height * 1.2
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "+S"
+        repetition: true
+        onClicked: updateTime(timeValue + 1000, "")
+    }
+
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Time
+        width: height * 1.2
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "+ms"
+        repetition: true
+        onClicked: updateTime(timeValue + 1, "")
+    }
+
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Beats
+        height: UISettings.iconSizeDefault
+        Layout.fillWidth: true
+        Layout.columnSpan: allowFractions !== QLCFunction.NoFractions ? 2 : 4
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "+"
+        repetition: true
+        onClicked: updateTime(timeValue + 1000, "")
+    }
+
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Beats && allowFractions !== QLCFunction.NoFractions
+        height: UISettings.iconSizeDefault
+        Layout.fillWidth: true
+        Layout.columnSpan: 2
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: allowFractions === QLCFunction.AllFractions ? "+1/8" : "+2x"
+        repetition: true
+        onClicked:
+        {
+            if (allowFractions === QLCFunction.AllFractions)
+                updateTime(timeValue + 125, "")
+            else
             {
-                anchors.fill: parent
-                inputText: "0h"
-                fontSize: btnFontSize
+                var tmpTime = timeValue
+                var newfraction = 0
+                if (currentFraction == 0)
+                    newfraction = 125
+                else if (currentFraction != 500)
+                    newfraction = currentFraction * 2
+
+                if (newfraction == 0)
+                    tmpTime += 1000
+
+                updateTime(tmpTime - currentFraction + newfraction, "")
+                currentFraction = newfraction
             }
         }
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: "#444"
-            border.width: 1
-            border.color: "#333"
+    }
 
-            CustomTextEdit
+    // middle row: tap, time value
+    Rectangle
+    {
+        height: UISettings.iconSizeDefault
+        color: "#444"
+        border.color: UISettings.bgMedium
+        Layout.fillWidth: true
+        Layout.columnSpan: 4
+
+        CustomTextEdit
+        {
+            id: timeBox
+            anchors.fill: parent
+            //anchors.fill: parent
+            textAlignment: TextInput.AlignHCenter
+            radius: 0
+            inputText: timeValueString
+            fontSize: btnFontSize
+
+            onEnterPressed: updateTime(-1, inputText)
+            Keys.onTabPressed:
             {
-                anchors.fill: parent
-                inputText: "0m"
-                fontSize: btnFontSize
+                updateTime(-1, inputText)
+                toolRoot.tabPressed(true)
+            }
+            Keys.onBacktabPressed:
+            {
+                updateTime(-1, inputText)
+                toolRoot.tabPressed(false)
+            }
+            onEscapePressed:
+            {
+                tapTimer.stop()
+                toolRoot.visible = false
+                toolRoot.closed()
             }
         }
-        Rectangle
-        {
-            width: 40
-            height: 35
-            color: "#444"
-            border.width: 1
-            border.color: "#333"
-
-            CustomTextEdit
-            {
-                anchors.fill: parent
-                inputText: "0s"
-                fontSize: btnFontSize
-            }
-        }
-        Rectangle
-        {
-            width: 40
-            height: 35
-            color: "#444"
-            border.width: 1
-            border.color: "#333"
-
-            CustomTextEdit
-            {
-                anchors.fill: parent
-                inputText: ".00"
-                fontSize: btnFontSize
-            }
-        }
-
     }
 
     // bottom row: infinite, decrease values
-    Row
+    GenericButton
     {
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
+        width: height
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "∞"
+        onClicked: updateTime(-2, "")
+    }
 
-            RobotoText
-            {
-                anchors.centerIn: parent
-                label: "∞"
-                fontSize: btnFontSize
-            }
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Time
+        width: height
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "-M"
+        repetition: true
+        onClicked:
+        {
+            if (timeValue < 60000)
+                return
+            updateTime(timeValue - (60 * 1000), "")
         }
+    }
 
-        Rectangle
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Time
+        width: height * 1.2
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "-S"
+        repetition: true
+        onClicked:
         {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
-
-            RobotoText
-            {
-                anchors.centerIn: parent
-                label: "-H"
-                fontSize: btnFontSize
-            }
+            if (timeValue < 1000)
+                return
+            updateTime(timeValue - 1000, "")
         }
-        Rectangle
-        {
-            width: 35
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
+    }
 
-            RobotoText
-            {
-                anchors.centerIn: parent
-                label: "-M"
-                fontSize: btnFontSize
-            }
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Time
+        width: height * 1.2
+        height: UISettings.iconSizeDefault
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "-ms"
+        repetition: true
+        onClicked:
+        {
+            if (timeValue == 0)
+                return
+            updateTime(timeValue - 1, "")
         }
+    }
 
-        Rectangle
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Beats
+        height: UISettings.iconSizeDefault
+        Layout.fillWidth: true
+        Layout.columnSpan: allowFractions !== QLCFunction.NoFractions ? 2 : 4
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: "-"
+        repetition: true
+        onClicked: updateTime(timeValue - 1000, "")
+    }
+
+    GenericButton
+    {
+        visible: tempoType === QLCFunction.Beats && allowFractions !== QLCFunction.NoFractions
+        height: UISettings.iconSizeDefault
+        Layout.fillWidth: true
+        Layout.columnSpan: 2
+        border.color: UISettings.bgMedium
+        bgColor: buttonsBgColor
+        fontSize: btnFontSize
+        label: allowFractions === QLCFunction.AllFractions ? "-1/8" : "-x/2"
+        repetition: true
+        onClicked:
         {
-            width: 40
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
-
-            RobotoText
+            if (allowFractions === QLCFunction.AllFractions)
             {
-                anchors.centerIn: parent
-                label: "-S"
-                fontSize: btnFontSize
+                if (timeValue == 0)
+                    return
+
+                updateTime(timeValue - 125, "")
             }
-        }
-
-        Rectangle
-        {
-            width: 40
-            height: 35
-            color: bgCol
-            border.width: 1
-            border.color: "#333"
-
-            RobotoText
+            else
             {
-                anchors.centerIn: parent
-                label: "-ms"
-                fontSize: btnFontSize
+                var tmpTime = timeValue
+                var newfraction = 0
+                if (currentFraction == 0)
+                {
+                    newfraction = 500
+                    if (tmpTime > 0)
+                        tmpTime -= 1000
+                }
+                else if (currentFraction != 125)
+                    newfraction = currentFraction / 2
+
+                updateTime(tmpTime - currentFraction + newfraction, "")
+                currentFraction = newfraction
             }
         }
     }

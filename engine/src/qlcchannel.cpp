@@ -20,6 +20,7 @@
 
 #include <QXmlStreamReader>
 #include <QStringList>
+#include <QMetaEnum>
 #include <QPainter>
 #include <iostream>
 #include <QString>
@@ -53,22 +54,41 @@
 #define KXMLQLCChannelColourWhite      QString("White")
 #define KXMLQLCChannelColourUV         QString("UV")
 #define KXMLQLCChannelColourLime       QString("Lime")
+#define KXMLQLCChannelColourIndigo     QString("Indigo")
 
-QLCChannel::QLCChannel()
+QLCChannel::QLCChannel(QObject *parent)
+    : QObject(parent)
+    , m_preset(Custom)
+    , m_group(Intensity)
+    , m_defaultValue(0)
+    , m_controlByte(MSB)
+    , m_colour(NoColour)
 {
-    m_group = Intensity;
-    m_controlByte = MSB;
-    m_colour = NoColour;
 }
 
-QLCChannel::QLCChannel(const QLCChannel* channel)
+QLCChannel *QLCChannel::createCopy()
 {
-    m_group = Intensity;
-    m_controlByte = MSB;
-    m_colour = NoColour;
+    QLCChannel *copy = new QLCChannel();
+    copy->setPreset(this->preset());
+    if (this->preset() != Custom)
+    {
+        copy->setName(this->name());
+        copy->addPresetCapability();
+    }
+    else
+    {
+        copy->setGroup(this->group());
+        copy->setControlByte(this->controlByte());
+        copy->setColour(this->colour());
+        copy->setName(this->name());
 
-    if (channel != NULL)
-        *this = *channel;
+        QListIterator<QLCCapability*> it(this->capabilities());
+        while (it.hasNext() == true)
+            copy->addCapability(it.next()->createCopy());
+    }
+    copy->setDefaultValue(this->defaultValue());
+
+    return copy;
 }
 
 QLCChannel::~QLCChannel()
@@ -84,7 +104,9 @@ QLCChannel& QLCChannel::operator=(const QLCChannel& channel)
         QListIterator<QLCCapability*> it(channel.m_capabilities);
 
         m_name = channel.m_name;
+        m_preset = channel.m_preset;
         m_group = channel.m_group;
+        m_defaultValue = channel.m_defaultValue;
         m_controlByte = channel.m_controlByte;
         m_colour = channel.m_colour;
 
@@ -103,6 +125,467 @@ QLCChannel& QLCChannel::operator=(const QLCChannel& channel)
 quint32 QLCChannel::invalid()
 {
     return UINT_MAX;
+}
+
+/*********************************************************************
+ * Presets
+ *********************************************************************/
+
+QString QLCChannel::presetToString(QLCChannel::Preset preset)
+{
+    int index = staticMetaObject.indexOfEnumerator("Preset");
+    return staticMetaObject.enumerator(index).valueToKey(preset);
+}
+
+QLCChannel::Preset QLCChannel::stringToPreset(const QString &preset)
+{
+    int index = staticMetaObject.indexOfEnumerator("Preset");
+    return Preset(staticMetaObject.enumerator(index).keyToValue(preset.toStdString().c_str()));
+}
+
+QLCChannel::Preset QLCChannel::preset() const
+{
+    return m_preset;
+}
+
+/* please see
+https://github.com/mcallegari/qlcplus/wiki/Fixture-definition-presets
+when changing this function */
+void QLCChannel::setPreset(QLCChannel::Preset preset)
+{
+    if (preset == m_preset)
+        return;
+
+    m_preset = preset;
+
+    if (preset == Custom)
+        return;
+
+    Group grp = Intensity;
+    PrimaryColour col = NoColour;
+    ControlByte cb = MSB;
+    QString prname;
+
+    switch (preset)
+    {
+        case IntensityMasterDimmer:
+            prname = "Master dimmer";
+        break;
+        case IntensityMasterDimmerFine:
+            prname = "Master dimmer fine";
+            cb = LSB;
+        break;
+        case IntensityDimmer:
+            prname = "Dimmer";
+        break;
+        case IntensityDimmerFine:
+            prname = "Dimmer fine";
+            cb = LSB;
+        break;
+        case IntensityRed:
+            prname = KXMLQLCChannelColourRed;
+            col = Red;
+        break;
+        case IntensityRedFine:
+            prname = KXMLQLCChannelColourRed + " fine";
+            col = Red;
+            cb = LSB;
+        break;
+        case IntensityGreen:
+            prname = KXMLQLCChannelColourGreen;
+            col = Green;
+        break;
+        case IntensityGreenFine:
+            prname = KXMLQLCChannelColourGreen + " fine";
+            col = Green;
+            cb = LSB;
+        break;
+        case IntensityBlue:
+            prname = KXMLQLCChannelColourBlue;
+            col = Blue;
+        break;
+        case IntensityBlueFine:
+            prname = KXMLQLCChannelColourBlue + " fine";
+            col = Blue;
+            cb = LSB;
+        break;
+        case IntensityCyan:
+            prname = KXMLQLCChannelColourCyan;
+            col = Cyan;
+        break;
+        case IntensityCyanFine:
+            prname = KXMLQLCChannelColourCyan + " fine";
+            col = Cyan;
+            cb = LSB;
+        break;
+        case IntensityMagenta:
+            prname = KXMLQLCChannelColourMagenta;
+            col = Magenta;
+        break;
+        case IntensityMagentaFine:
+            prname = KXMLQLCChannelColourMagenta + " fine";
+            col = Magenta;
+            cb = LSB;
+        break;
+        case IntensityYellow:
+            prname = KXMLQLCChannelColourYellow;
+            col = Yellow;
+        break;
+        case IntensityYellowFine:
+            prname = KXMLQLCChannelColourYellow + " fine";
+            col = Yellow;
+            cb = LSB;
+        break;
+        case IntensityAmber:
+            prname = KXMLQLCChannelColourAmber;
+            col = Amber;
+        break;
+        case IntensityAmberFine:
+            prname = KXMLQLCChannelColourAmber + " fine";
+            col = Amber;
+            cb = LSB;
+        break;
+        case IntensityWhite:
+            prname = KXMLQLCChannelColourWhite;
+            col = White;
+        break;
+        case IntensityWhiteFine:
+            prname = KXMLQLCChannelColourWhite + " fine";
+            col = White;
+            cb = LSB;
+        break;
+        case IntensityUV:
+            prname = KXMLQLCChannelColourUV;
+            col = UV;
+        break;
+        case IntensityUVFine:
+            prname = KXMLQLCChannelColourUV + " fine";
+            col = UV;
+            cb = LSB;
+        break;
+        case IntensityIndigo:
+            prname = KXMLQLCChannelColourIndigo;
+            col = Indigo;
+        break;
+        case IntensityIndigoFine:
+            prname = KXMLQLCChannelColourIndigo + " fine";
+            col = Indigo;
+            cb = LSB;
+        break;
+        case IntensityLime:
+            prname = KXMLQLCChannelColourLime;
+            col = Lime;
+        break;
+        case IntensityLimeFine:
+            prname = KXMLQLCChannelColourLime + " fine";
+            col = Lime;
+            cb = LSB;
+        break;
+        case IntensityHue:
+            prname = "Hue";
+            //col = Hue;
+        break;
+        case IntensityHueFine:
+            prname = "Hue fine";
+            //col = Hue;
+            cb = LSB;
+        break;
+        case IntensitySaturation:
+            prname = "Saturation";
+            //col = Saturation;
+        break;
+        case IntensitySaturationFine:
+            prname = "Saturation fine";
+            //col = Saturation;
+            cb = LSB;
+        break;
+        case IntensityLightness:
+            prname = "Lightness";
+            //col = Lightness;
+        break;
+        case IntensityLightnessFine:
+            prname = "Lightness fine";
+            //col = Lightness;
+            cb = LSB;
+        break;
+        case IntensityValue:
+            prname = "Value";
+            //col = Value;
+        break;
+        case IntensityValueFine:
+            prname = "Value fine";
+            //col = Value;
+            cb = LSB;
+        break;
+        case PositionPan:
+            grp = Pan;
+            prname = KXMLQLCChannelGroupPan;
+        break;
+        case PositionPanFine:
+            grp = Pan;
+            prname = KXMLQLCChannelGroupPan + " fine";
+            cb = LSB;
+        break;
+        case PositionTilt:
+            grp = Tilt;
+            prname = KXMLQLCChannelGroupTilt;
+        break;
+        case PositionTiltFine:
+            grp = Tilt;
+            prname = KXMLQLCChannelGroupTilt + " fine";
+            cb = LSB;
+        break;
+        case PositionXAxis:
+            grp = Pan;
+            prname = "X Axis";
+        break;
+        case PositionYAxis:
+            grp = Tilt;
+            prname = "Y Axis";
+        break;
+        case SpeedPanSlowFast:
+        case SpeedPanFastSlow:
+            grp = Speed;
+            prname = "Pan speed";
+        break;
+        case SpeedTiltSlowFast:
+        case SpeedTiltFastSlow:
+            grp = Speed;
+            prname = "Tilt speed";
+        break;
+        case SpeedPanTiltSlowFast:
+        case SpeedPanTiltFastSlow:
+            grp = Speed;
+            prname = "Pan/Tilt speed";
+        break;
+        case ColorMacro:
+            grp = Colour;
+            prname = "Color macro";
+        break;
+        case ColorWheel:
+            grp = Colour;
+            prname = "Color wheel";
+        break;
+        case ColorWheelFine:
+            grp = Colour;
+            prname = "Color wheel fine";
+            cb = LSB;
+        break;
+        case ColorRGBMixer:
+            grp = Colour;
+            prname = "RGB mixer";
+        break;
+        case ColorCTOMixer:
+            grp = Colour;
+            prname = "CTO mixer";
+        break;
+        case ColorCTCMixer:
+            grp = Colour;
+            prname = "CTC mixer";
+        break;
+        case ColorCTBMixer:
+            grp = Colour;
+            prname = "CTB mixer";
+        break;
+        case GoboWheel:
+            grp = Gobo;
+            prname = "Gobo wheel";
+        break;
+        case GoboWheelFine:
+            grp = Gobo;
+            prname = "Gobo wheel fine";
+            cb = LSB;
+        break;
+        case GoboIndex:
+            grp = Gobo;
+            prname = "Gobo index";
+        break;
+        case GoboIndexFine:
+            grp = Gobo;
+            prname = "Gobo index fine";
+            cb = LSB;
+        break;
+        case ShutterStrobeSlowFast:
+        case ShutterStrobeFastSlow:
+            grp = Shutter;
+            prname = "Strobe";
+        break;
+        case ShutterIrisMinToMax:
+        case ShutterIrisMaxToMin:
+            grp = Shutter;
+            prname = "Iris";
+        break;
+        case ShutterIrisFine:
+            grp = Shutter;
+            prname = "Iris fine";
+            cb = LSB;
+        break;
+        case BeamFocusNearFar:
+        case BeamFocusFarNear:
+            grp = Beam;
+            prname = "Focus";
+        break;
+        case BeamFocusFine:
+            grp = Beam;
+            prname = "Focus fine";
+            cb = LSB;
+        break;
+        case BeamZoomSmallBig:
+        case BeamZoomBigSmall:
+            grp = Beam;
+            prname = "Zoom";
+        break;
+        case BeamZoomFine:
+            grp = Beam;
+            prname = "Zoom fine";
+            cb = LSB;
+        break;
+        case PrismRotationFastSlow:
+        case PrismRotationSlowFast:
+            grp = Prism;
+            prname = "Prism rotation";
+        break;
+        case NoFunction:
+            grp = Nothing;
+            prname = "No function";
+        break;
+        default:
+        break;
+    }
+
+    if (name().isEmpty())
+        setName(prname);
+    setGroup(grp);
+    setColour(col);
+    setControlByte(cb);
+}
+
+/* please see
+https://github.com/mcallegari/qlcplus/wiki/Fixture-definition-presets
+when changing this function */
+QLCCapability *QLCChannel::addPresetCapability()
+{
+    QLCCapability *cap = new QLCCapability();
+    switch (m_preset)
+    {
+        case IntensityMasterDimmer:
+        case IntensityDimmer:
+            cap->setName(name() + " (0 - 100%)");
+        break;
+        case IntensityRed:
+        case IntensityGreen:
+        case IntensityBlue:
+        case IntensityCyan:
+        case IntensityMagenta:
+        case IntensityYellow:
+        case IntensityAmber:
+        case IntensityWhite:
+        case IntensityUV:
+        case IntensityIndigo:
+        case IntensityLime:
+        case IntensityHue:
+        case IntensitySaturation:
+        case IntensityLightness:
+        case IntensityValue:
+            cap->setName(name() + " intensity (0 - 100%)");
+        break;
+        case IntensityMasterDimmerFine:
+        case IntensityDimmerFine:
+        case IntensityRedFine:
+        case IntensityGreenFine:
+        case IntensityBlueFine:
+        case IntensityCyanFine:
+        case IntensityMagentaFine:
+        case IntensityYellowFine:
+        case IntensityAmberFine:
+        case IntensityWhiteFine:
+        case IntensityUVFine:
+        case IntensityIndigoFine:
+        case IntensityLimeFine:
+        case IntensityHueFine:
+        case IntensitySaturationFine:
+        case IntensityLightnessFine:
+        case IntensityValueFine:
+        case PositionPan:
+        case PositionPanFine:
+        case PositionTilt:
+        case PositionTiltFine:
+        case PositionXAxis:
+        case PositionYAxis:
+        case ColorWheelFine:
+        case ColorRGBMixer:
+        case ColorCTOMixer:
+        case ColorCTCMixer:
+        case ColorCTBMixer:
+        case GoboWheelFine:
+        case GoboIndexFine:
+        case ShutterIrisFine:
+        case BeamFocusFine:
+        case BeamZoomFine:
+        case NoFunction:
+            cap->setName(name());
+        break;
+        case SpeedPanSlowFast:
+            cap->setName("Pan (Slow to fast)");
+        break;
+        case SpeedPanFastSlow:
+            cap->setName("Pan (Fast to slow)");
+        break;
+        case SpeedTiltSlowFast:
+            cap->setName("Tilt (Slow to fast)");
+        break;
+        case SpeedTiltFastSlow:
+            cap->setName("Tilt (Fast to slow)");
+        break;
+        case SpeedPanTiltSlowFast:
+            cap->setName("Pan and tilt (Slow to fast)");
+        break;
+        case SpeedPanTiltFastSlow:
+            cap->setName("Pan and tilt (Fast to slow)");
+        break;
+        case ColorMacro:
+        case ColorWheel:
+        case GoboWheel:
+        case GoboIndex:
+            cap->setName(name() + " presets");
+        break;
+        case ShutterStrobeSlowFast:
+            cap->setName("Strobe (Slow to fast)");
+        break;
+        case ShutterStrobeFastSlow:
+            cap->setName("Strobe (Fast to slow)");
+        break;
+        case ShutterIrisMinToMax:
+            cap->setName("Iris (Minimum to maximum)");
+        break;
+        case ShutterIrisMaxToMin:
+            cap->setName("Iris (Maximum to minimum)");
+        break;
+        case BeamFocusNearFar:
+            cap->setName("Beam (Near to far)");
+        break;
+        case BeamFocusFarNear:
+            cap->setName("Beam (Far to near)");
+        break;
+        case BeamZoomSmallBig:
+            cap->setName("Zoom (Small to big)");
+        break;
+        case BeamZoomBigSmall:
+            cap->setName("Zoom (Big to small)");
+        break;
+        case PrismRotationSlowFast:
+            cap->setName("Prism rotation (Slow to fast)");
+        break;
+        case PrismRotationFastSlow:
+            cap->setName("Prism rotation (Fast to slow)");
+        break;
+        default:
+        break;
+    }
+
+    addCapability(cap);
+
+    return cap;
 }
 
 /*****************************************************************************
@@ -185,6 +668,8 @@ QLCChannel::Group QLCChannel::stringToGroup(const QString& str)
         return Tilt;
     else if (str == KXMLQLCChannelGroupMaintenance)
         return Maintenance;
+    else if (str == KXMLQLCChannelGroupNothing)
+        return Nothing;
     else
         return NoGroup;
 }
@@ -226,7 +711,7 @@ QIcon QLCChannel::getIntensityIcon() const
         pm = drawIntensity(Qt::red, "R");
     else if (m_colour == QLCChannel::Green)
         pm = drawIntensity(Qt::green, "G");
-    else if (m_colour == QLCChannel::Blue) 
+    else if (m_colour == QLCChannel::Blue)
         pm = drawIntensity(Qt::blue, "B");
     else if (m_colour == QLCChannel::Cyan)
         pm = drawIntensity(Qt::cyan, "C");
@@ -242,6 +727,8 @@ QIcon QLCChannel::getIntensityIcon() const
         pm = drawIntensity(QColor(0xFF9400D3), "UV");
     else if (m_colour == QLCChannel::Lime)
         pm = drawIntensity(QColor(0xFFADFF2F), "L");
+    else if (m_colour == QLCChannel::Indigo)
+        pm = drawIntensity(QColor(0xFF4B0082), "I");
     else
     {
         // None of the primary colours matched and since this is an
@@ -252,36 +739,41 @@ QIcon QLCChannel::getIntensityIcon() const
     return QIcon(pm);
 }
 
-QString QLCChannel::getIntensityColorCode() const
+QString QLCChannel::getIntensityColorCode(bool svg) const
 {
+    QString prefix = svg ? "qrc" : "";
+    QString ext = svg ? "svg" : "png";
+
     if (m_colour == QLCChannel::Red)
-        return QString("#FF0000");
+        return svg ? QString("qrc:/red.svg") : QString("#FF0000");
     else if (m_colour == QLCChannel::Green)
-        return QString("#00FF00");
+        return svg ? QString("qrc:/green.svg") : QString("#00FF00");
     else if (m_colour == QLCChannel::Blue)
-        return QString("#0000FF");
+        return svg ? QString("qrc:/blue.svg") : QString("#0000FF");
     else if (m_colour == QLCChannel::Cyan)
-        return QString("#00FFFF");
+        return svg ? QString("qrc:/cyan.svg") : QString("#00FFFF");
     else if (m_colour == QLCChannel::Magenta)
-        return QString("#FF00FF");
+        return svg ? QString("qrc:/magenta.svg") : QString("#FF00FF");
     else if (m_colour == QLCChannel::Yellow)
-        return QString("#FFFF00");
+        return svg ? QString("qrc:/yellow.svg") : QString("#FFFF00");
     else if (m_colour == QLCChannel::Amber)
-        return QString("#FF7E00");
+        return svg ? QString("qrc:/amber.svg") : QString("#FF7E00");
     else if (m_colour == QLCChannel::White)
-        return QString("#FFFFFF");
+        return svg ? QString("qrc:/white.svg") : QString("#FFFFFF");
     else if (m_colour == QLCChannel::UV)
-        return QString("#9400D3");
+        return svg ? QString("qrc:/uv.svg") : QString("#9400D3");
     else if (m_colour == QLCChannel::Lime)
-        return QString("#ADFF2F");
+        return svg ? QString("qrc:/lime.svg") : QString("#ADFF2F");
+    else if (m_colour == QLCChannel::Indigo)
+        return svg ? QString("qrc:/indigo.svg") : QString("#4B0082");
     else
     {
         // None of the primary colours matched and since this is an
         // intensity channel, it must be controlling a plain dimmer OSLT.
-        return QString(":/intensity.png");
+        return QString("%1:/intensity.%2").arg(prefix).arg(ext);
     }
 
-    return QString(":/intensity.png");
+    return QString("%1:/intensity.%2").arg(prefix).arg(ext);
 }
 
 QIcon QLCChannel::getIcon() const
@@ -292,25 +784,30 @@ QIcon QLCChannel::getIcon() const
         return QIcon(getIconNameFromGroup(group()));
 }
 
-QString QLCChannel::getIconNameFromGroup(QLCChannel::Group grp) const
+QString QLCChannel::getIconNameFromGroup(QLCChannel::Group grp, bool svg) const
 {
+    QString prefix = svg ? "qrc" : "";
+    QString ext = svg ? "svg" : "png";
+
     switch(grp)
     {
-        case Pan: return QString(":/pan.png"); break;
-        case Tilt: return QString(":/tilt.png"); break;
-        case Colour: return QString(":/colorwheel.png"); break;
-        case Effect: return QString(":/star.png"); break;
-        case Gobo: return QString(":/gobo.png"); break;
-        case Shutter: return QString(":/shutter.png"); break;
-        case Speed: return QString(":/speed.png"); break;
-        case Prism: return QString(":/prism.png"); break;
-        case Maintenance: return QString(":/configure.png"); break;
-        case Intensity: return getIntensityColorCode(); break;
-        case Beam: return QString(":/beam.png"); break;
+        case Pan: return QString("%1:/pan.%2").arg(prefix).arg(ext); break;
+        case Tilt: return QString("%1:/tilt.%2").arg(prefix).arg(ext); break;
+        case Colour: return QString("%1:/colorwheel.%2").arg(prefix).arg(ext); break;
+        case Effect: return QString("%1:/star.%2").arg(prefix).arg(ext); break;
+        case Gobo: return QString("%1:/gobo.%2").arg(prefix).arg(ext); break;
+        case Shutter: return QString("%1:/shutter.%2").arg(prefix).arg(ext); break;
+        case Speed: return QString("%1:/speed.%2").arg(prefix).arg(ext); break;
+        case Prism: return QString("%1:/prism.%2").arg(prefix).arg(ext); break;
+        case Maintenance: return QString("%1:/configure.%2").arg(prefix).arg(ext); break;
+        case Intensity: return getIntensityColorCode(svg); break;
+        case Beam: return QString("%1:/beam.%2").arg(prefix).arg(ext); break;
+        case Nothing: return QString("%1:/uncheck.%2").arg(prefix).arg(ext); break;
         default:
         break;
     }
-    return QString(":/intensity.png");
+
+    return QString("%1:/intensity.%2").arg(prefix).arg(ext);
 }
 
 /*****************************************************************************
@@ -325,6 +822,16 @@ QString QLCChannel::name() const
 void QLCChannel::setName(const QString &name)
 {
     m_name = name;
+}
+
+uchar QLCChannel::defaultValue() const
+{
+    return m_defaultValue;
+}
+
+void QLCChannel::setDefaultValue(uchar value)
+{
+    m_defaultValue = value;
 }
 
 void QLCChannel::setControlByte(ControlByte byte)
@@ -344,7 +851,7 @@ QLCChannel::ControlByte QLCChannel::controlByte() const
 QStringList QLCChannel::colourList()
 {
     QStringList list;
-    list << KXMLQLCChannelColourGeneric;
+    //list << KXMLQLCChannelColourGeneric;
     list << KXMLQLCChannelColourRed;
     list << KXMLQLCChannelColourGreen;
     list << KXMLQLCChannelColourBlue;
@@ -355,6 +862,7 @@ QStringList QLCChannel::colourList()
     list << KXMLQLCChannelColourWhite;
     list << KXMLQLCChannelColourUV;
     list << KXMLQLCChannelColourLime;
+    list << KXMLQLCChannelColourIndigo;
     return list;
 }
 
@@ -382,6 +890,8 @@ QString QLCChannel::colourToString(PrimaryColour colour)
         return KXMLQLCChannelColourUV;
     case Lime:
         return KXMLQLCChannelColourLime;
+    case Indigo:
+        return KXMLQLCChannelColourIndigo;
     case NoColour:
     default:
         return KXMLQLCChannelColourGeneric;
@@ -410,6 +920,8 @@ QLCChannel::PrimaryColour QLCChannel::stringToColour(const QString& str)
         return UV;
     else if (str == KXMLQLCChannelColourLime)
         return Lime;
+    else if (str == KXMLQLCChannelColourIndigo)
+        return Indigo;
     else
         return NoColour;
 }
@@ -544,6 +1056,16 @@ bool QLCChannel::saveXML(QXmlStreamWriter *doc) const
     doc->writeStartElement(KXMLQLCChannel);
     doc->writeAttribute(KXMLQLCChannelName, m_name);
 
+    if (m_defaultValue)
+        doc->writeAttribute(KXMLQLCChannelDefault, QString::number(m_defaultValue));
+
+    if (m_preset != Custom)
+    {
+        doc->writeAttribute(KXMLQLCChannelPreset, presetToString(m_preset));
+        doc->writeEndElement();
+        return true;
+    }
+
     /* Group */
     doc->writeStartElement(KXMLQLCChannelGroup);
     /* Group control byte */
@@ -573,11 +1095,26 @@ bool QLCChannel::loadXML(QXmlStreamReader &doc)
         return false;
     }
 
+    QXmlStreamAttributes attrs = doc.attributes();
+
     /* Get channel name */
-    QString str = doc.attributes().value(KXMLQLCChannelName).toString();
+    QString str = attrs.value(KXMLQLCChannelName).toString();
     if (str.isEmpty() == true)
         return false;
     setName(str);
+
+    if (attrs.hasAttribute(KXMLQLCChannelDefault))
+    {
+        str = attrs.value(KXMLQLCChannelDefault).toString();
+        setDefaultValue(uchar(str.toInt()));
+    }
+
+    if (attrs.hasAttribute(KXMLQLCChannelPreset))
+    {
+        str = attrs.value(KXMLQLCChannelPreset).toString();
+        setPreset(stringToPreset(str));
+        addPresetCapability();
+    }
 
     /* Subtags */
     while (doc.readNextStartElement())

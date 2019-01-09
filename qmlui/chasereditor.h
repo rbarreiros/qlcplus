@@ -21,20 +21,23 @@
 #define CHASEREDITOR_H
 
 #include "functioneditor.h"
+#include "scenevalue.h"
 
 class Chaser;
+class ListModel;
+class ChaserStep;
 
 class ChaserEditor : public FunctionEditor
 {
     Q_OBJECT
 
-    Q_PROPERTY(QString chaserName READ chaserName WRITE setChaserName NOTIFY chaserNameChanged)
+    Q_PROPERTY(bool isSequence READ isSequence CONSTANT)
     Q_PROPERTY(QVariant stepsList READ stepsList NOTIFY stepsListChanged)
-    Q_PROPERTY(int runOrder READ runOrder WRITE setRunOrder NOTIFY runOrderChanged)
-    Q_PROPERTY(int direction READ direction WRITE setDirection NOTIFY directionChanged)
+    Q_PROPERTY(int tempoType READ tempoType WRITE setTempoType NOTIFY tempoTypeChanged)
     Q_PROPERTY(int stepsFadeIn READ stepsFadeIn WRITE setStepsFadeIn NOTIFY stepsFadeInChanged)
     Q_PROPERTY(int stepsFadeOut READ stepsFadeOut WRITE setStepsFadeOut NOTIFY stepsFadeOutChanged)
     Q_PROPERTY(int stepsDuration READ stepsDuration WRITE setStepsDuration NOTIFY stepsDurationChanged)
+    Q_PROPERTY(int playbackIndex READ playbackIndex WRITE setPlaybackIndex NOTIFY playbackIndexChanged)
 
 public:
     ChaserEditor(QQuickView *view, Doc *doc, QObject *parent = 0);
@@ -42,72 +45,113 @@ public:
     /** Set the ID of the Chaser being edited */
     void setFunctionID(quint32 ID);
 
+    /** Returns if the Chaser being edited is a Sequence */
+    bool isSequence() const;
+
+    static void updateStepsList(Doc *doc, Chaser *chaser, ListModel *stepsList);
+
+    /** Return the Chaser step list formatted as explained in m_stepsList */
     QVariant stepsList() const;
-
-    /** Return the name of the Chaser being edited */
-    QString chaserName() const;
-
-    /** Set the name of the Chaser being edited */
-    void setChaserName(QString chaserName);
 
     /**
      * Add a function to the Chaser being edited.
      *
-     * @param fid The function ID to add
+     * @param idsList A list of function IDs to add
+     * @param insertIndex a specific insertion index (-1 means append)
+     *
      * @return true if successful, otherwise false
      */
-    Q_INVOKABLE bool addFunction(quint32 fid, int insertIndex = -1);
+    Q_INVOKABLE bool addFunctions(QVariantList idsList, int insertIndex = -1);
 
-    /*********************************************************************
-     * Chaser playback modes
-     *********************************************************************/
+    /**
+     * Add a new step to the Sequence being edited.
+     *
+     * @param insertIndex a specific insertion index (-1 means append)
+     *
+     * @return true if successful, otherwise false
+     */
+    Q_INVOKABLE bool addStep(int insertIndex = -1);
 
-    /** Return the run order of the Chaser being edited */
-    int runOrder() const;
+    /**
+     * Move the selected steps at @insertIndex position
+     *
+     * @param indicesList A list of step indices to move
+     * @param insertIndex a specific insertion index (-1 means append)
+     *
+     * @return true if successful, otherwise false
+     */
+    Q_INVOKABLE bool moveSteps(QVariantList indicesList, int insertIndex = -1);
 
-    /** Set the run order of the Chaser being edited */
-    void setRunOrder(int runOrder);
+    void setSequenceStepValue(SceneValue& scv);
 
-    /** Return the playback direction of the Chaser being edited */
-    int direction() const;
+    /** Get/Set the Chaser playback start index */
+    int playbackIndex() const;
+    void setPlaybackIndex(int playbackIndex);
 
-    /** Set the run order of the Chaser being edited */
-    void setDirection(int direction);
+    /** @reimp */
+    void setPreviewEnabled(bool enable);
 
-    /*********************************************************************
-     * Steps speed mode
-     *********************************************************************/
+    /** @reimp */
+    void deleteItems(QVariantList list);
 
-    /** Return the steps fade in mode of the Chaser being edited */
-    int stepsFadeIn() const;
+protected:
+    /** Set the steps $param to $value.
+     *  If $selectedOnly is true, $value is applied only to the selected steps,
+     *  otherwise it will be applied to all the steps */
+    void setSelectedValue(Function::PropType type, QString param, uint value, bool selectedOnly = true);
 
-    /** Set the steps fade in mode of the Chaser being edited */
-    void setStepsFadeIn(int stepsFadeIn);
+    static void addStepToListModel(Doc *doc, Chaser *chaser, ListModel *stepsList, ChaserStep *step);
 
-    /** Return the steps fade out mode of the Chaser being edited */
-    int stepsFadeOut() const;
-
-    /** Set the steps fade out mode of the Chaser being edited */
-    void setStepsFadeOut(int stepsFadeOut);
-
-    /** Return the steps duration mode of the Chaser being edited */
-    int stepsDuration() const;
-
-    /** Set the steps duration mode of the Chaser being edited */
-    void setStepsDuration(int stepsDuration);
+protected slots:
+    /** Slot invoked during Chaser playback when the step index changes */
+    void slotStepChanged(int index);
 
 signals:
-    void chaserNameChanged(QString chaserName);
     void stepsListChanged();
-    void runOrderChanged(int runOrder);
-    void directionChanged(int direction);
-    void stepsFadeInChanged(int stepsFadeIn);
-    void stepsFadeOutChanged(int stepsFadeOut);
-    void stepsDurationChanged(int stepsDuration);
+    void playbackIndexChanged(int playbackIndex);
 
 private:
     /** Reference of the Chaser currently being edited */
     Chaser *m_chaser;
+    /** Reference to a ListModel representing the steps list for the QML UI,
+     *  organized as follows:
+     *  funcID | isSelected | fadeIn | fadeOut | hold | duration | note
+     */
+    ListModel *m_stepsList;
+    /** Index of the current step being played. -1 when stopped */
+    int m_playbackIndex;
+
+    /*********************************************************************
+     * Steps speed mode
+     *********************************************************************/
+public:
+    /** Get/Set the steps tempo type of the Chaser being edited */
+    int tempoType() const;
+    void setTempoType(int tempoType);
+
+    /** Get/Set the steps fade in mode of the Chaser being edited */
+    int stepsFadeIn() const;
+    void setStepsFadeIn(int stepsFadeIn);
+
+    /** Get/Set the steps fade out mode of the Chaser being edited */
+    int stepsFadeOut() const;
+    void setStepsFadeOut(int stepsFadeOut);
+
+    /** Get/Set the steps duration mode of the Chaser being edited */
+    int stepsDuration() const;
+    void setStepsDuration(int stepsDuration);
+
+    /** Set the speed value with $type of the step at $index */
+    Q_INVOKABLE void setStepSpeed(int index, int value, int type);
+
+    /** Ste the notes text of the step at $index */
+    Q_INVOKABLE void setStepNote(int index, QString text);
+
+signals:
+    void tempoTypeChanged(int tempoType);
+    void stepsFadeInChanged(int stepsFadeIn);
+    void stepsFadeOutChanged(int stepsFadeOut);
+    void stepsDurationChanged(int stepsDuration);
 };
 
 #endif // CHASEREDITOR_H

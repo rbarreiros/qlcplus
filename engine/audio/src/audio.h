@@ -37,15 +37,15 @@ class Audio : public Function
     Q_OBJECT
     Q_DISABLE_COPY(Audio)
 
-    Q_PROPERTY (QString sourceFilename READ getSourceFileName WRITE setSourceFileName NOTIFY sourceFilenameChanged)
-
     /*********************************************************************
      * Initialization
      *********************************************************************/
 public:
-    Audio() { }
     Audio(Doc* doc);
     virtual ~Audio();
+
+    /** @reimp */
+    QIcon getIcon() const;
 
 private:
     Doc *m_doc;
@@ -53,7 +53,7 @@ private:
      * Copying
      *********************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     Function* createCopy(Doc* doc, bool addToDoc = true);
 
     /** Copy the contents for this function from another function */
@@ -68,26 +68,12 @@ public slots:
      * Capabilities
      *********************************************************************/
 public:
-    Q_INVOKABLE QStringList getCapabilities();
+    QStringList getCapabilities();
 
     /*********************************************************************
      * Properties
      *********************************************************************/
 public:
-    /**
-     * Set the time where the Audio object is placed over a timeline
-     *
-     * @param time The start time in milliseconds of the Audio object
-     */
-    void setStartTime(quint32 time);
-
-    /**
-     * Returns the time where the Audio object is placed over a timeline
-     *
-     * @return Start time in milliseconds of the Audio object
-     */
-    quint32 getStartTime() const;
-
     /**
      * Returns the duration of the source audio file loaded
      *
@@ -96,20 +82,11 @@ public:
     quint32 totalDuration();
 
     /**
-     * Set the color to be used by a AudioItem
+     * Set the playback duration of the audio file
+     *
+     * @param The playback total duration in milliseconds
      */
-    void setColor(QColor color);
-
-    /**
-     * Get the color of this Audio object
-     */
-    QColor getColor();
-
-    /** Set the lock state of the item */
-    void setLocked(bool locked);
-
-    /** Get the lock state of the item */
-    bool isLocked();
+    void setTotalDuration(quint32 msec);
 
     /**
      * Set the source file name used by this Audio object
@@ -137,7 +114,7 @@ public:
      */
     QString audioDevice();
 
-    void adjustAttribute(qreal fraction, int attributeIndex);
+    int adjustAttribute(qreal fraction, int attributeId);
 
 signals:
     void sourceFilenameChanged();
@@ -182,6 +159,9 @@ public:
 public:
     /** @reimpl */
     void preRun(MasterTimer*);
+
+    /** @reimpl */
+    void setPause(bool enable);
 
     /** @reimpl */
     void write(MasterTimer* timer, QList<Universe*> universes);

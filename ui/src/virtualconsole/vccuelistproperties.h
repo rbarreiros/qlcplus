@@ -49,18 +49,16 @@ public:
 public slots:
     void accept();
     void slotTabChanged();
-    void slotCF1AutoDetectionToggled(bool checked);
-    void slotCF2AutoDetectionToggled(bool checked);
 
 protected:
     VCCueList* m_cueList;
     Doc* m_doc;
     InputSelectionWidget *m_playInputWidget;
+    InputSelectionWidget *m_stopInputWidget;
     InputSelectionWidget *m_nextInputWidget;
     InputSelectionWidget *m_prevInputWidget;
 
-    InputSelectionWidget *m_crossfade1InputWidget;
-    InputSelectionWidget *m_crossfade2InputWidget;
+    InputSelectionWidget *m_crossfadeInputWidget;
 
     /************************************************************************
      * Cues
@@ -68,6 +66,7 @@ protected:
 protected slots:
     void slotChaserAttachClicked();
     void slotChaserDetachClicked();
+    void slotPlaybackLayoutChanged();
 
 private:
     void updateChaserName();

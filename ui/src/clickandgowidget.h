@@ -45,6 +45,8 @@ public:
         Yellow,
         Amber,
         White,
+        Lime,
+        Indigo,
         UV,
         RGB,
         CMY,
@@ -166,9 +168,9 @@ signals:
     void levelChanged(uchar level);
     void colorChanged(QRgb color);
     void levelAndPresetChanged(uchar level, QImage img);
-    
+
 public slots:
-    
+
 };
 
 /** @} */

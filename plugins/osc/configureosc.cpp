@@ -51,6 +51,9 @@ ConfigureOSC::ConfigureOSC(OSCPlugin* plugin, QWidget* parent)
     /* Setup UI controls */
     setupUi(this);
 
+    connect(m_oscPathEdit, SIGNAL(textChanged(QString)),
+            this, SLOT(slotOSCPathChanged(QString)));
+
     fillMappingTree();
 }
 
@@ -160,11 +163,7 @@ void ConfigureOSC::fillMappingTree()
         }
     }
 
-    m_uniMapTree->resizeColumnToContents(KMapColumnInterface);
-    m_uniMapTree->resizeColumnToContents(KMapColumnUniverse);
-    m_uniMapTree->resizeColumnToContents(KMapColumnInputPort);
-    m_uniMapTree->resizeColumnToContents(KMapColumnOutputAddress);
-    m_uniMapTree->resizeColumnToContents(KMapColumnOutputPort);
+    m_uniMapTree->header()->resizeSections(QHeaderView::ResizeToContents);
 }
 
 void ConfigureOSC::showIPAlert(QString ip)
@@ -226,6 +225,11 @@ void ConfigureOSC::accept()
     }
 
     QDialog::accept();
+}
+
+void ConfigureOSC::slotOSCPathChanged(QString path)
+{
+    m_chNumSpin->setValue(qChecksum(path.toUtf8().data(), path.length()));
 }
 
 int ConfigureOSC::exec()

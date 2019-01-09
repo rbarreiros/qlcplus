@@ -77,24 +77,32 @@ MonitorFixtureItem::MonitorFixtureItem(Doc *doc, quint32 fid)
             //qDebug() << "Add CMY comp at address:" << cmyComp;
         }
 
-        if (head.masterIntensityChannel() != QLCChannel::invalid())
+        fxiItem->m_dimmer = head.channelNumber(QLCChannel::Intensity, QLCChannel::MSB);
+        if (fxiItem->m_dimmer != QLCChannel::invalid())
         {
-            fxiItem->m_masterDimmer = head.masterIntensityChannel();
+            qDebug() << "Set dimmer to:" << fxiItem->m_dimmer;
+        }
+
+        fxiItem->m_masterDimmer = fxi->masterIntensityChannel();
+        if (fxiItem->m_masterDimmer != QLCChannel::invalid())
+        {
             qDebug() << "Set master dimmer to:" << fxiItem->m_masterDimmer;
+        }
+
+        if ((fxiItem->m_dimmer != QLCChannel::invalid()) || (fxiItem->m_masterDimmer != QLCChannel::invalid()))
+        {
             fxiItem->m_back = new QGraphicsEllipseItem(this);
             fxiItem->m_back->setPen(QPen(Qt::white, 1));
             fxiItem->m_back->setBrush(QBrush(Qt::black));
         }
         else
         {
-            fxiItem->m_masterDimmer = QLCChannel::invalid();
             fxiItem->m_back = NULL;
         }
 
-        fxiItem->m_panChannel = QLCChannel::invalid();
-        if (head.panMsbChannel() != QLCChannel::invalid())
+        fxiItem->m_panChannel = head.channelNumber(QLCChannel::Pan, QLCChannel::MSB);
+        if (fxiItem->m_panChannel != QLCChannel::invalid())
         {
-            fxiItem->m_panChannel = head.panMsbChannel();
             // retrieve the PAN max degrees from the fixture mode
             fxiItem->m_panMaxDegrees = 360; // fallback. Very unprecise
             QLCFixtureMode *mode = fxi->fixtureMode();
@@ -107,10 +115,9 @@ MonitorFixtureItem::MonitorFixtureItem(Doc *doc, quint32 fid)
             qDebug() << "Pan channel on" << fxiItem->m_panChannel << "max degrees:" << fxiItem->m_panMaxDegrees;
         }
 
-        fxiItem->m_tiltChannel = QLCChannel::invalid();
-        if (head.tiltMsbChannel() != QLCChannel::invalid())
+        fxiItem->m_tiltChannel = head.channelNumber(QLCChannel::Tilt, QLCChannel::MSB);
+        if (fxiItem->m_tiltChannel != QLCChannel::invalid())
         {
-            fxiItem->m_tiltChannel = head.tiltMsbChannel();
             // retrieve the TILT max degrees from the fixture mode
             fxiItem->m_tiltMaxDegrees = 270; // fallback. Very unprecise
             QLCFixtureMode *mode = fxi->fixtureMode();
@@ -132,14 +139,14 @@ MonitorFixtureItem::MonitorFixtureItem(Doc *doc, quint32 fid)
                QLCChannel *ch = mode->channel(wheel);
                if (ch == NULL)
                    continue;
- 
+
                bool containsColor = false;
                for(quint32 i = 0; i < 256; ++i)
                {
                    QLCCapability *cap = ch->searchCapability(i);
-                   if (cap != NULL)
+                   if (cap != NULL && cap->resource(0).isValid())
                    {
-                       values << cap->resourceColor1();
+                       values << cap->resource(0).value<QColor>();
                        containsColor = true;
                    }
                    else
@@ -161,42 +168,56 @@ MonitorFixtureItem::MonitorFixtureItem(Doc *doc, quint32 fid)
                QLCChannel *ch = mode->channel(shutter);
                if (ch == NULL)
                    continue;
- 
+
                bool containsShutter = false;
-               for (quint32 i = 0; i < 256; ++i)
+
+               switch (ch->preset())
                {
-                   QLCCapability *cap = ch->searchCapability(i);
-                   if (cap != NULL)
+                   case QLCChannel::ShutterStrobeFastSlow:
+                   case QLCChannel::ShutterStrobeSlowFast:
                    {
-                       // not "off" occurences are ok, but anything better would require manual classification
-                       if (cap->name().contains("close", Qt::CaseInsensitive) 
-                           || cap->name().contains("blackout", Qt::CaseInsensitive)
-                           || cap->name().contains("off", Qt::CaseInsensitive))                       {
-                           values << FixtureHead::Closed;
-                           containsShutter = true;
-                       }
-                       else if (cap->name().contains("strob", Qt::CaseInsensitive) 
-                           || cap->name().contains("pulse", Qt::CaseInsensitive))
-                       {
-                           values << FixtureHead::Strobe;
-                           containsShutter = true;
-                       }
-                       else
-                           values << FixtureHead::Open;
-                   }
-                   else
-                   {
+                       // handle case when the channel has only one capability 0-255 strobe:
+                       // make 0 Open to avoid blinking
                        values << FixtureHead::Open;
+                       for (i = 1; i < 255; i++)
+                           values << FixtureHead::Strobe;
+                       containsShutter = true;
                    }
+                   break;
+                   case QLCChannel::Custom:
+                   {
+                       foreach (QLCCapability *cap, ch->capabilities())
+                       {
+                           for (int i = cap->min(); i <= cap->max(); i++)
+                           {
+                               switch (cap->preset())
+                               {
+                                   case QLCCapability::Custom:
+                                       values << FixtureHead::Open;
+                                   break;
+                                   case QLCCapability::ShutterOpen:
+                                       values << FixtureHead::Open;
+                                       containsShutter = true;
+                                   break;
+                                   case QLCCapability::ShutterClose:
+                                       values << FixtureHead::Closed;
+                                       containsShutter = true;
+                                   break;
+                                   default:
+                                       values << FixtureHead::Strobe;
+                                       containsShutter = true;
+                                   break;
+                               }
+                           }
+                       }
+                   }
+                   break;
+                   default:
+                   break;
                }
 
                if (containsShutter)
                {
-                   // handle case when the channel has only one capability 0-255 strobe:
-                   // make 0 Open to avoid blinking
-                   if (ch->capabilities().size() <= 1)
-                       values[0] = FixtureHead::Open;
-
                    fxiItem->m_shutterValues[shutter] = values;
                    fxiItem->m_shutterChannels << shutter;
                }
@@ -280,7 +301,7 @@ void MonitorFixtureItem::setSize(QSize size)
     double cellWidth = headsWidth / columns;
     double cellHeight = headsHeight / rows;
     double headDiam = (cellWidth < cellHeight) ? cellWidth : cellHeight;
-    
+
     int ypos = (cellHeight - headDiam) / 2;
     for (int i = 0; i < rows; i++)
     {
@@ -302,7 +323,7 @@ void MonitorFixtureItem::setSize(QSize size)
                 {
                     head->setRect(head->rect().adjusted(MOVEMENT_THICKNESS + 1, MOVEMENT_THICKNESS + 1, -MOVEMENT_THICKNESS - 1, -MOVEMENT_THICKNESS - 1));
                 }
- 
+
                 head->setZValue(2);
                 QGraphicsEllipseItem *back = m_heads.at(index)->m_back;
                 if (back != NULL)
@@ -324,13 +345,13 @@ void MonitorFixtureItem::setSize(QSize size)
     update();
 }
 
-QColor MonitorFixtureItem::computeColor(FixtureHead *head, const QByteArray & values)
+QColor MonitorFixtureItem::computeColor(const FixtureHead *head, const QByteArray & values)
 {
     foreach (quint32 c, head->m_colorWheels)
     {
         const uchar val = static_cast<uchar>(values.at(c));
         QColor col = head->m_colorValues[c].at(val);
-        if (col.isValid())
+        if (col.isValid() && col != Qt::black)
             return col;
     }
 
@@ -351,7 +372,7 @@ QColor MonitorFixtureItem::computeColor(FixtureHead *head, const QByteArray & va
         y = values.at(head->m_cmy.at(2));
         return QColor::fromCmyk(c, m, y, 0);
     }
-    
+
     if (m_gelColor.isValid())
     {
         return m_gelColor;
@@ -359,16 +380,29 @@ QColor MonitorFixtureItem::computeColor(FixtureHead *head, const QByteArray & va
 
     return QColor(255,255,255);
 }
-uchar MonitorFixtureItem::computeAlpha(FixtureHead *head, const QByteArray & values)
+uchar MonitorFixtureItem::computeAlpha(const FixtureHead *head, const QByteArray & values)
 {
-    uchar alpha = 255;
-    if (head->m_masterDimmer != UINT_MAX /*QLCChannel::invalid()*/)
-        alpha = values.at(head->m_masterDimmer);
+    // postpone division as late as possible to improve accuracy
+    unsigned mul = 255U;
+    unsigned div = 1U;
 
-    return alpha; 
+    if (head->m_masterDimmer != UINT_MAX /*QLCChannel::invalid()*/)
+    {
+        mul *= static_cast<uchar>(values.at(head->m_masterDimmer));
+        div *= 255U;
+    }
+
+    if (head->m_dimmer != UINT_MAX /*QLCChannel::invalid()*/)
+    {
+        mul *= static_cast<uchar>(values.at(head->m_dimmer));
+        div *= 255U;
+    }
+
+    //qDebug() << mul << "/" << div << "=" << (mul /div);
+    return mul / div;
 }
 
-FixtureHead::ShutterState MonitorFixtureItem::computeShutter(FixtureHead *head, const QByteArray & values)
+FixtureHead::ShutterState MonitorFixtureItem::computeShutter(const FixtureHead *head, const QByteArray & values)
 {
     FixtureHead::ShutterState result = FixtureHead::Open;
 
@@ -376,7 +410,7 @@ FixtureHead::ShutterState MonitorFixtureItem::computeShutter(FixtureHead *head, 
     {
         const uchar val = static_cast<uchar>(values.at(c));
         FixtureHead::ShutterState state = head->m_shutterValues[c].at(val);
-        if (state == FixtureHead::Closed) 
+        if (state == FixtureHead::Closed)
         {
             return state;
         }
@@ -406,11 +440,10 @@ void MonitorFixtureItem::slotUpdateValues()
 
     foreach(FixtureHead *head, m_heads)
     {
-
         head->m_color = computeColor(head, fxValues);
         head->m_dimmerValue = computeAlpha(head, fxValues);
         head->m_shutterState = computeShutter(head, fxValues);
- 
+
         QColor col = head->m_color;
         col.setAlpha(head->m_dimmerValue);
 
@@ -468,12 +501,12 @@ void MonitorFixtureItem::slotStrobeTimer()
     {
         if (head->m_strobeTimer != timer)
             continue;
-       
+
         if (head->m_dimmerValue == 0 || head->m_shutterState != FixtureHead::Strobe)
             return;
 
         head->m_strobePhase = (head->m_strobePhase + 1) % 2;
-        
+
         QColor col = head->m_color;
         col.setAlpha(head->m_dimmerValue);
         if (head->m_strobePhase != 0)
@@ -520,7 +553,7 @@ void MonitorFixtureItem::paint(QPainter *painter, const QStyleOptionGraphicsItem
         if (head->m_tiltChannel != UINT_MAX /*QLCChannel::invalid()*/)
         {
             rect.adjust(-MOVEMENT_THICKNESS, -MOVEMENT_THICKNESS, MOVEMENT_THICKNESS, MOVEMENT_THICKNESS);
-            
+
             painter->setPen(QPen(defColor, MOVEMENT_THICKNESS));
             painter->drawArc(rect, 270 * 16 - head->m_tiltMaxDegrees * 16 / 2 - 8, 16);
             painter->drawArc(rect, 270 * 16 + head->m_tiltMaxDegrees * 16 / 2 - 8, 16);

@@ -44,6 +44,7 @@ AudioRendererAlsa::AudioRendererAlsa(QString device, QObject * parent)
     else
         dev_name = device;
 
+    m_inited = false;
     m_use_mmap = false;
     pcm_name = strdup(dev_name.toLatin1().data());
     pcm_handle = NULL;
@@ -84,7 +85,6 @@ bool AudioRendererAlsa::initialize(quint32 freq, int chan, AudioFormat format)
 
     uint buffer_time = 500000;
     uint period_time = 100000;
-    bool use_pause =  false;
 
     snd_pcm_hw_params_t *hwparams = 0;
     snd_pcm_sw_params_t *swparams = 0;
@@ -197,9 +197,10 @@ bool AudioRendererAlsa::initialize(quint32 freq, int chan, AudioFormat format)
     //setup needed values
     m_bits_per_frame = snd_pcm_format_physical_width(alsa_format) * chan;
     m_chunk_size = period_size;
-    m_can_pause = snd_pcm_hw_params_can_pause(hwparams) && use_pause;
+    m_can_pause = snd_pcm_hw_params_can_pause(hwparams);
+
     qDebug("OutputALSA: can pause: %d", m_can_pause);
-    //configure(freq, chan, format); //apply configuration
+
     //create alsa prebuffer;
     m_prebuf_size = m_bits_per_frame * m_chunk_size / 8;
     m_prebuf = (uchar *)malloc(m_prebuf_size);
@@ -217,7 +218,6 @@ qint64 AudioRendererAlsa::latency()
 QList<AudioDeviceInfo> AudioRendererAlsa::getDevicesInfo()
 {
     QList<AudioDeviceInfo> devList;
-    int err;
     int cardIdx = -1;
 
     while( snd_card_next( &cardIdx ) == 0 && cardIdx >= 0 )
@@ -226,6 +226,7 @@ QList<AudioDeviceInfo> AudioRendererAlsa::getDevicesInfo()
         snd_ctl_card_info_t *cardInfo;
         char str[64];
         int devIdx = -1;
+        int err;
 
         // Open this card's control interface. We specify only the card number -- not
         // any device nor sub-device too
@@ -386,10 +387,11 @@ long AudioRendererAlsa::alsa_write(unsigned char *data, long size)
 
 void AudioRendererAlsa::drain()
 {
-    long m = 0;
     snd_pcm_uframes_t l = snd_pcm_bytes_to_frames(pcm_handle, m_prebuf_fill);
+
     while (l > 0)
     {
+        long m = 0;
         if ((m = alsa_write(m_prebuf, l)) >= 0)
         {
             l -= m;
@@ -416,16 +418,13 @@ void AudioRendererAlsa::suspend()
 {
     if (m_can_pause)
         snd_pcm_pause(pcm_handle, 1);
-    snd_pcm_prepare(pcm_handle);
 }
 
 void AudioRendererAlsa::resume()
 {
     if (m_can_pause)
         snd_pcm_pause(pcm_handle, 0);
-    snd_pcm_prepare(pcm_handle);
 }
-
 
 void AudioRendererAlsa::uninitialize()
 {

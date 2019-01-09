@@ -18,6 +18,7 @@
 */
 
 #include "videoprovider.h"
+#include "qlcfile.h"
 #include "doc.h"
 
 #include <QApplication>
@@ -47,7 +48,7 @@ void VideoProvider::slotFunctionAdded(quint32 id)
     if (func == NULL)
         return;
 
-    if(func->type() == Function::Video)
+    if(func->type() == Function::VideoType)
     {
         VideoWidget *vWidget = new VideoWidget(qobject_cast<Video *>(func));
         m_videoMap[id] = vWidget;
@@ -78,6 +79,13 @@ VideoWidget::VideoWidget(Video *video, QObject *parent)
     m_videoPlayer = new QMediaPlayer(this, QMediaPlayer::VideoSurface);
     m_videoPlayer->moveToThread(QCoreApplication::instance()->thread());
 
+    if (QLCFile::getQtRuntimeVersion() >= 50700 && m_videoWidget == NULL)
+    {
+        m_videoWidget = new QVideoWidget;
+        m_videoWidget->setStyleSheet("background-color:black;");
+        m_videoPlayer->setVideoOutput(m_videoWidget);
+    }
+
     connect(m_videoPlayer, SIGNAL(mediaStatusChanged(QMediaPlayer::MediaStatus)),
             this, SLOT(slotStatusChanged(QMediaPlayer::MediaStatus)));
     connect(m_videoPlayer, SIGNAL(metaDataChanged(QString,QVariant)),
@@ -89,6 +97,8 @@ VideoWidget::VideoWidget(Video *video, QObject *parent)
             this, SLOT(slotSourceUrlChanged(QString)));
     connect(m_video, SIGNAL(requestPlayback()),
             this, SLOT(slotPlaybackVideo()));
+    connect(m_video, SIGNAL(requestPause(bool)),
+            this, SLOT(slotSetPause(bool)));
     connect(m_video, SIGNAL(requestStop()),
             this, SLOT(slotStopVideo()));
     connect(m_video, SIGNAL(requestBrightnessAdjust(int)),
@@ -176,7 +186,7 @@ void VideoWidget::slotMetaDataChanged(QString key, QVariant data)
 
 void VideoWidget::slotPlaybackVideo()
 {
-    if (m_videoWidget == NULL)
+    if (QLCFile::getQtRuntimeVersion() < 50700 && m_videoWidget == NULL)
     {
         m_videoWidget = new QVideoWidget;
         m_videoWidget->setStyleSheet("background-color:black;");
@@ -189,18 +199,22 @@ void VideoWidget::slotPlaybackVideo()
     if (m_video->fullscreen() == false)
     {
         QSize resolution = m_video->resolution();
+        m_videoWidget->setFullScreen(false);
         if (resolution.isEmpty())
             m_videoWidget->setGeometry(0, 50, 640, 480);
         else
             m_videoWidget->setGeometry(0, 50, resolution.width(), resolution.height());
         m_videoWidget->move(rect.topLeft());
-        m_videoWidget->setFullScreen(false);
     }
     else
     {
-        m_videoWidget->setGeometry(rect);
-        m_videoWidget->move(rect.topLeft());
+#if defined(WIN32) || defined(Q_OS_WIN)
         m_videoWidget->setFullScreen(true);
+        m_videoWidget->setGeometry(rect);
+#else
+        m_videoWidget->setGeometry(rect);
+        m_videoWidget->setFullScreen(true);
+#endif
     }
 
     if (m_videoPlayer->isSeekable())
@@ -209,9 +223,16 @@ void VideoWidget::slotPlaybackVideo()
         m_videoPlayer->setPosition(0);
 
     m_videoWidget->show();
-
+    m_videoWidget->setWindowFlags(m_videoWidget->windowFlags() | Qt::WindowStaysOnTopHint);
     m_videoPlayer->play();
+}
 
+void VideoWidget::slotSetPause(bool enable)
+{
+    if (enable)
+        m_videoPlayer->pause();
+    else
+        m_videoPlayer->play();
 }
 
 void VideoWidget::slotStopVideo()

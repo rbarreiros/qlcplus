@@ -21,7 +21,6 @@
 #ifndef COLLECTION_H
 #define COLLECTION_H
 
-#include <QVariant>
 #include <QMutex>
 #include <QList>
 #include <QSet>
@@ -34,29 +33,35 @@ class QXmlStreamReader;
  * @{
  */
 
+typedef struct
+{
+    quint32 m_id;
+    int m_intensityId;
+} ChildFunction;
+
 class Collection : public Function
 {
     Q_OBJECT
     Q_DISABLE_COPY(Collection)
 
-    Q_PROPERTY(QVariantList functions READ functions NOTIFY functionsChanged)
-
     /*********************************************************************
      * Initialization
      *********************************************************************/
 public:
-    Collection();
     Collection(Doc* doc);
     virtual ~Collection();
 
-    /** @reimpl */
+    /** @reimp */
+    QIcon getIcon() const;
+
+    /** @reimp */
     quint32 totalDuration();
 
     /*********************************************************************
      * Copying
      *********************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     Function* createCopy(Doc* doc, bool addToDoc = true);
 
     /** Copy the contents for this function from another function */
@@ -73,7 +78,7 @@ public:
      * @param fid The function to add
      * @return true if successful, otherwise false
      */
-    Q_INVOKABLE bool addFunction(quint32 fid, int insertIndex = -1);
+    bool addFunction(quint32 fid, int insertIndex = -1);
 
     /**
      * Remove a function from this collection. If the function is not a
@@ -82,12 +87,12 @@ public:
      * @param fid The function to remove
      * @return true if successful, otherwise false
      */
-    Q_INVOKABLE bool removeFunction(quint32 fid);
+    bool removeFunction(quint32 fid);
 
     /**
      * Get this function's list of member functions
      */
-    QVariantList functions() const;
+    QList <quint32> functions() const;
 
 signals:
     void functionsChanged();
@@ -98,7 +103,12 @@ public slots:
     void slotFunctionRemoved(quint32 function);
 
 protected:
-    QVariantList m_functions;
+    /** The list of Function IDs added to this Collection */
+    QList <quint32> m_functions;
+    /** A list of intesity attribute override IDs populated when this Collection is
+     *  started and cleaned when it's stopped */
+    QList <int> m_intensityOverrideIds;
+
     mutable QMutex m_functionListMutex;
 
     /*********************************************************************
@@ -115,7 +125,11 @@ public:
     void postLoad();
 
 public:
-    virtual bool contains(quint32 functionId);
+    /** @reimp */
+    bool contains(quint32 functionId);
+
+    /** @reimp */
+    QList<quint32> components();
 
     /*********************************************************************
      * Running
@@ -126,6 +140,9 @@ private:
 public:
     /** @reimpl */
     void preRun(MasterTimer* timer);
+
+    /** @reimpl */
+    void setPause(bool enable);
 
     /** @reimpl */
     void write(MasterTimer* timer, QList<Universe *> universes);
@@ -149,8 +166,15 @@ protected:
      * Intensity
      *************************************************************************/
 public:
-    /** @reimpl */
-    virtual void adjustAttribute(qreal fraction, int attributeIndex);
+    /** @reimp */
+    int adjustAttribute(qreal fraction, int attributeId);
+
+    /*************************************************************************
+     * Blend mode
+     *************************************************************************/
+public:
+    /** @reimp */
+    void setBlendMode(Universe::BlendMode mode);
 };
 
 /** @} */

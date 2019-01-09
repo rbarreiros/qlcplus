@@ -26,33 +26,21 @@ var universeIndex, address, channels, quantity, gap;
 
 function initProperties()
 {
-    manufacturer = fxPropsRect.fxManufacturer
-    model = fxPropsRect.fxModel
-    mode = fxPropsRect.fxMode
-    name = fxPropsRect.fxName
-    universeIndex = fxPropsRect.fxUniverseIndex
-    address = fxPropsRect.fxAddress - 1
-    channels = fxPropsRect.fxChannels
-    quantity = fxPropsRect.fxQuantity
-    gap = fxPropsRect.fxGap
+    manufacturer = fixtureBrowser.selectedManufacturer;
+    model = fixtureBrowser.selectedModel;
+    mode = fixtureBrowser.selectedMode;
+    name = fixtureBrowser.fixtureName;
+    universeIndex = fxPropsRect.fxUniverseIndex;
+    address = fxPropsRect.fxAddress - 1;
+    channels = fixtureBrowser.modeChannelsCount;
+    quantity = fxPropsRect.fxQuantity;
+    gap = fxPropsRect.fxGap;
     console.log("mf: " + manufacturer + ", mdl: " + model + ", mode: " + mode);
     console.log("addr: " + address + ", ch: " + channels);
 }
 
-//Creation is split into two functions due to an asynchronous wait while
-//possible external files are loaded.
-
-function loadComponent()
-{
-    if (itemComponent != null) // component has been previously loaded
-    {
-        createItem();
-        return;
-    }
-
-    itemComponent = Qt.createComponent("FixtureDragItem.qml");
-    createItem();
-}
+// Creation is split into two functions due to an asynchronous wait while
+// possible external files are loaded.
 
 function createItem()
 {
@@ -72,6 +60,18 @@ function createItem()
     }
 }
 
+function loadComponent()
+{
+    if (itemComponent != null) // component has been previously loaded
+    {
+        createItem();
+        return;
+    }
+
+    itemComponent = Qt.createComponent("FixtureDragItem.qml");
+    createItem();
+}
+
 function handleDrag(mouse)
 {
     if (draggedItem == null)
@@ -87,21 +87,28 @@ function handleDrag(mouse)
 function endDrag(mouse)
 {
     if (draggedItem == null)
-        return;
-
-    var currContext = previewLoader.item.contextName;
-    console.log("Current context: " + currContext)
-    var x = 0;
-    var y = 0;
-    if (currContext === "2D")
     {
-        x = draggedItem.x - leftSidePanel.width;
-        y = draggedItem.y - previewLoader.y - viewToolbar.height
+        return;
     }
 
-    fixtureManager.addFixture(manufacturer, model, mode, name,
-                              universeIndex, draggedItem.address, channels, quantity, gap,
-                              x, y);
+    var currContext = previewLoader.item.contextName;
+    var offset = 0;
+    console.log("Current context: " + currContext);
+    if (currContext === "2D")
+    {
+        offset = View2D.gridPosition.x;
+    }
+    var x = draggedItem.x - leftSidePanel.width - offset;
+    var y = draggedItem.y - previewLoader.y - viewToolbar.height;
+
+    console.log("Item x: " + x + ", y: " + y);
+
+    if (x >= 0 && y >= 0)
+    {
+        fixtureManager.addFixture(manufacturer, model, mode, name, universeIndex,
+                                  draggedItem.address, channels, quantity, gap, x, y);
+    }
+
     draggedItem.destroy();
     draggedItem = null;
 }

@@ -409,6 +409,48 @@ void QLCFixtureMode_Test::copy()
     delete anotherDef;
 }
 
+void QLCFixtureMode_Test::intensityChannels()
+{
+    QLCFixtureDef def;
+
+    QLCChannel * masterCh = new QLCChannel();
+    masterCh->setGroup(QLCChannel::Intensity);
+    masterCh->setControlByte(QLCChannel::MSB);
+    masterCh->setColour(QLCChannel::NoColour);
+    def.addChannel(masterCh);
+
+    QLCChannel * h1Ch = new QLCChannel();
+    h1Ch->setGroup(QLCChannel::Intensity);
+    h1Ch->setControlByte(QLCChannel::MSB);
+    h1Ch->setColour(QLCChannel::NoColour);
+    def.addChannel(h1Ch);
+
+    QLCChannel * h2Ch = new QLCChannel();
+    h2Ch->setGroup(QLCChannel::Intensity);
+    h2Ch->setControlByte(QLCChannel::MSB);
+    h2Ch->setColour(QLCChannel::NoColour);
+    def.addChannel(h2Ch);
+
+    QLCFixtureMode mode(&def);
+    mode.insertChannel(masterCh, 0);
+    mode.insertChannel(h1Ch, 1);
+    mode.insertChannel(h2Ch, 2);
+
+    QLCFixtureHead h1;
+    h1.addChannel(1);
+    mode.insertHead(0, h1);
+
+    QLCFixtureHead h2;
+    h2.addChannel(2);
+    mode.insertHead(1, h2);
+
+    mode.cacheHeads();
+
+    QCOMPARE(mode.masterIntensityChannel(), 0U);
+    QCOMPARE(mode.heads()[0].channelNumber(QLCChannel::Intensity, QLCChannel::MSB), 1U);
+    QCOMPARE(mode.heads()[1].channelNumber(QLCChannel::Intensity, QLCChannel::MSB), 2U);
+}
+
 void QLCFixtureMode_Test::load()
 {
     QBuffer buffer;
@@ -596,14 +638,7 @@ void QLCFixtureMode_Test::save()
 
     while (xmlReader.readNextStartElement())
     {
-        if (xmlReader.name() == KXMLQLCPhysical)
-        {
-            // Only check that physical node is there. Its contents are
-            // tested by another test case (QLCPhysical_Test)
-            physical = true;
-            xmlReader.skipCurrentElement();
-        }
-        else if (xmlReader.name() == KXMLQLCChannel)
+        if (xmlReader.name() == KXMLQLCChannel)
         {
             int num = xmlReader.attributes().value(KXMLQLCFixtureModeChannelNumber).toString().toInt();
             channels[num] = xmlReader.readElementText();
@@ -615,13 +650,66 @@ void QLCFixtureMode_Test::save()
         }
     }
 
-    QVERIFY(physical == true);
+    QVERIFY(physical == false);
     QCOMPARE(channels.size(), 4);
     QCOMPARE(channels[0], m_ch1->name());
     QCOMPARE(channels[1], m_ch4->name());
     QCOMPARE(channels[2], m_ch2->name());
     QCOMPARE(channels[3], m_ch3->name());
     QCOMPARE(heads, 3);
+}
+
+void QLCFixtureMode_Test::savePhysicalOverride()
+{
+    QVERIFY(m_fixtureDef != NULL);
+    QCOMPARE(m_fixtureDef->channels().size(), 4);
+
+    QString name("Foobar");
+    QLCFixtureMode mode(m_fixtureDef);
+    mode.setName(name);
+
+    QVERIFY(mode.useGlobalPhysical() == true);
+
+    QLCPhysical phy;
+    phy.setWeight(10);
+    phy.setWidth(11);
+    phy.setHeight(12);
+    phy.setDepth(13);
+
+    mode.setPhysical(phy);
+
+    QVERIFY(mode.useGlobalPhysical() == false);
+
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+
+    QVERIFY(mode.saveXML(&xmlWriter) == true);
+
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+
+    xmlReader.readNextStartElement();
+
+    QCOMPARE(xmlReader.name().toString(), QString(KXMLQLCFixtureMode));
+
+    bool physical = false;
+
+    while (xmlReader.readNextStartElement())
+    {
+        if (xmlReader.name() == KXMLQLCPhysical)
+        {
+            // Only check that physical node is there. Its contents are
+            // tested by another test case (QLCPhysical_Test)
+            physical = true;
+            xmlReader.skipCurrentElement();
+        }
+    }
+
+    QVERIFY(physical == true);
 }
 
 void QLCFixtureMode_Test::cleanupTestCase()

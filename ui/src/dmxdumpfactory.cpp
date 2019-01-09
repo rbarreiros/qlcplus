@@ -94,20 +94,17 @@ DmxDumpFactory::~DmxDumpFactory()
 void DmxDumpFactory::slotUpdateChasersTree()
 {
     m_addtoTree->clear();
-    foreach(Function *f, m_doc->functionsByType(Function::Chaser))
+    foreach(Function *f, m_doc->functionsByType(Function::ChaserType))
     {
         Chaser *chaser = qobject_cast<Chaser*>(f);
-        if (chaser->isSequence() == false)
-        {
-            QTreeWidgetItem *item = new QTreeWidgetItem(m_addtoTree);
-            item->setText(KColumnTargetName, chaser->name());
-            item->setText(KColumnTargetID, QString::number(chaser->id()));
-            item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-            if (m_properties->isChaserSelected(chaser->id()))
-                item->setCheckState(KColumnName, Qt::Checked);
-            else
-                item->setCheckState(KColumnName, Qt::Unchecked);
-        }
+        QTreeWidgetItem *item = new QTreeWidgetItem(m_addtoTree);
+        item->setText(KColumnTargetName, chaser->name());
+        item->setText(KColumnTargetID, QString::number(chaser->id()));
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        if (m_properties->isChaserSelected(chaser->id()))
+            item->setCheckState(KColumnName, Qt::Checked);
+        else
+            item->setCheckState(KColumnName, Qt::Unchecked);
     }
 }
 
@@ -125,7 +122,7 @@ void DmxDumpFactory::slotSelectSceneButtonClicked()
 {
     FunctionSelection fs(this, m_doc);
     fs.setMultiSelection(false);
-    fs.setFilter(Function::Scene, true);
+    fs.setFilter(Function::SceneType, true);
 
     if (fs.exec() == QDialog::Accepted && fs.selection().size() > 0)
     {
@@ -173,12 +170,12 @@ QList<VCWidget *> DmxDumpFactory::getChildren(VCWidget *obj, int type)
 void DmxDumpFactory::updateWidgetsTree(int type)
 {
     m_addtoTree->clear();
-    VCFrame* contents = VirtualConsole::instance()->contents();
+    VCFrame *contents = VirtualConsole::instance()->contents();
     QList<VCWidget *> widgetsList = getChildren((VCWidget *)contents, type);
 
     foreach (QObject *object, widgetsList)
     {
-        VCWidget *widget = (VCWidget *)object;
+        VCWidget *widget = qobject_cast<VCWidget *>(object);
 
         QTreeWidgetItem *item = new QTreeWidgetItem(m_addtoTree);
         item->setText(KColumnTargetName, widget->caption());
@@ -207,9 +204,24 @@ void DmxDumpFactory::accept()
 {
     QByteArray dumpMask = m_properties->channelsMask();
     QList<Universe*> ua = m_doc->inputOutputMap()->claimUniverses();
-    QByteArray preGMValues; //= ua->preGMValues();
-    for (int i = 0; i < ua.count(); i++)
-        preGMValues.append(ua.at(i)->preGMValues());
+
+    QByteArray preGMValues(ua.size() * UNIVERSE_SIZE, 0); //= ua->preGMValues();
+
+    for (int i = 0; i < ua.count(); ++i)
+    {
+        const int offset = i * UNIVERSE_SIZE;
+        preGMValues.replace(offset, UNIVERSE_SIZE, ua.at(i)->preGMValues());
+        if (ua.at(i)->passthrough())
+        {
+            for (int j = 0; j < UNIVERSE_SIZE; ++j)
+            {
+                const int ofs = offset + j;
+                preGMValues[ofs] =
+                    static_cast<char>(ua.at(i)->applyPassthrough(j, static_cast<uchar>(preGMValues[ofs])));
+            }
+        }
+    }
+
     m_doc->inputOutputMap()->releaseUniverses(false);
 
     Scene *newScene = NULL;

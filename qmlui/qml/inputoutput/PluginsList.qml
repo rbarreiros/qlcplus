@@ -18,6 +18,7 @@
 */
 
 import QtQuick 2.0
+import "."
 
 Rectangle
 {
@@ -51,31 +52,25 @@ Rectangle
             Item
             {
                 id: root
-                height: 60
+                height: UISettings.listItemHeight * 1.7
                 width: pluginsContainer.width
 
                 MouseArea
                 {
                     id: delegateRoot
                     width: pluginsContainer.width
-                    height: 60
+                    height: parent.height
 
                     drag.target: pluginItem
-                    drag.threshold: 30
+                    drag.threshold: height / 2
 
-                    onPressed: pluginItem.color = "#444"
                     onReleased:
                     {
-                        pluginItem.x = 3
-                        pluginItem.y = 0
-
                         if (pluginItem.Drag.target !== null)
                         {
+                            pluginItem.Drag.drop()
                             if (pluginsContainer.isInput === false)
                             {
-                                ioManager.addOutputPatch(
-                                        pluginItem.pluginUniverse, pluginItem.pluginName,
-                                        pluginItem.pluginLine)
                                 uniListView.model = ioManager.universeOutputSources(universeIndex)
                             }
                             else
@@ -91,12 +86,15 @@ Rectangle
                             parent = root
                             pluginItem.color = "transparent"
                         }
+                        pluginItem.x = 3
+                        pluginItem.y = 0
                     }
 
                     PluginDragItem
                     {
                         id: pluginItem
                         x: 3
+                        color: delegateRoot.pressed ? "#444" : "transparent"
 
                         // this key must match the one in UniverseIOItem, to avoid dragging
                         // an input plugin on output and vice-versa
@@ -108,9 +106,9 @@ Rectangle
                         pluginLine: modelData.line
 
                         Drag.active: delegateRoot.drag.active
-                        Drag.source: delegateRoot
-                        Drag.hotSpot.x: width / 2
-                        Drag.hotSpot.y: height / 2
+                        Drag.source: pluginItem
+                        //Drag.hotSpot.x: width / 2
+                        //Drag.hotSpot.y: height / 2
                         Drag.keys: [ dragKey ]
 
                         // line divider

@@ -18,36 +18,28 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Layouts 1.0
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
 import "."
 
 Rectangle
 {
     id: fxDelegate
     width: 100
-    height: 35
+    height: UISettings.listItemHeight
 
     color: "transparent"
 
     property Fixture cRef
     property string textLabel: cRef ? cRef.name : ""
+    property int itemType: App.FixtureDragItem
     property bool isSelected: false
+    property bool isCheckable: false
+    property bool isChecked: false
+    property Item dragItem
 
-    signal clicked(int ID, var qItem, int mouseMods)
-    signal doubleClicked(int fID, int fType)
-
-    function iconFromType(type)
-    {
-        if (type === "Color Changer")
-            return "qrc:/fixture.svg";
-        else if (type === "Dimmer")
-            return "qrc:/dimmer.svg";
-        else if (type === "Moving Head")
-            return "qrc:/movinghead.svg";
-        else
-            return "qrc:/fixture.svg";
-    }
+    signal mouseEvent(int type, int iID, int iType, var qItem, int mouseMods)
 
     Rectangle
     {
@@ -57,36 +49,43 @@ Rectangle
         visible: isSelected
     }
 
-    IconTextEntry
+    RowLayout
     {
-        id: fxEntry
-        width: parent.width
-        height: parent.height
-        tLabel: textLabel
-        iSrc: cRef ? iconFromType(cRef.type) : ""
+        anchors.fill: parent
+
+        CustomCheckBox
+        {
+            id: chCheckBox
+            visible: isCheckable
+            implicitWidth: UISettings.listItemHeight
+            implicitHeight: implicitWidth
+            checked: isChecked
+            onCheckedChanged: fxDelegate.mouseEvent(App.Checked, cRef.id, checked, fxDelegate, 0)
+        }
+
+        IconTextEntry
+        {
+            Layout.fillWidth: true
+            height: fxDelegate.height
+            tLabel: fxDelegate.textLabel
+            iSrc: cRef ? cRef.iconResource(true) : ""
+
+            MouseArea
+            {
+                anchors.fill: parent
+                hoverEnabled: true
+
+                onClicked: fxDelegate.mouseEvent(App.Clicked, cRef.id, cRef.type, fxDelegate, mouse.modifiers)
+                onDoubleClicked: fxDelegate.mouseEvent(App.DoubleClicked, cRef.id, cRef.type, fxDelegate, -1)
+            }
+        }
     }
+
     Rectangle
     {
         width: parent.width
         height: 1
         y: parent.height - 1
         color: "#666"
-    }
-
-    MouseArea
-    {
-        id: fxMouseArea
-        anchors.fill: parent
-        hoverEnabled: true
-
-        onClicked:
-        {
-            isSelected = true
-            fxDelegate.clicked(cRef.id, fxDelegate, mouse.modifiers)
-        }
-        onDoubleClicked:
-        {
-            fxDelegate.doubleClicked(cRef.id, -1)
-        }
     }
 }

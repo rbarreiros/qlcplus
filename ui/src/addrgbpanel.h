@@ -32,7 +32,7 @@ class AddRGBPanel : public QDialog, public Ui_AddRGBPanel
 {
     Q_OBJECT
     Q_DISABLE_COPY(AddRGBPanel)
-    
+
 public:
     AddRGBPanel(QWidget *parent, const Doc* doc);
     ~AddRGBPanel();
@@ -51,6 +51,12 @@ public:
         ZigZag
     };
 
+    enum Direction {
+    	Undefined,
+		Horizontal,
+		Vertical
+    };
+
     QString name();
     int universeIndex();
     int address();
@@ -60,6 +66,7 @@ public:
     quint32 physicalHeight();
     Orientation orientation();
     Type type();
+    Direction direction();
     Fixture::Components components();
 
 private:

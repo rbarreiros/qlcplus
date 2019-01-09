@@ -80,16 +80,18 @@ void AudioPluginCache::load(const QDir &dir)
             /* Just append the plugin path to be used at runtime
              * for dynamic creation of instances */
             ptr->initialize("");
-            m_pluginsPathList << path;
+            m_pluginsMap[ptr->priority()] = path;
             loader.unload();
         }
+        else
+            qDebug() << "Failed to load plugin: " << loader.errorString();
     }
 }
 
 QStringList AudioPluginCache::getSupportedFormats()
 {
     QStringList caps;
-    foreach(QString path, m_pluginsPathList)
+    foreach(QString path, m_pluginsMap.values())
     {
         QPluginLoader loader(path, this);
         AudioDecoder* ptr = qobject_cast<AudioDecoder*> (loader.instance());
@@ -110,7 +112,7 @@ AudioDecoder *AudioPluginCache::getDecoderForFile(const QString &filename)
     if (fn.exists() == false)
         return NULL;
 
-    foreach(QString path, m_pluginsPathList)
+    foreach(QString path, m_pluginsMap.values())
     {
         QPluginLoader loader(path, this);
         AudioDecoder* ptr = qobject_cast<AudioDecoder*> (loader.instance());

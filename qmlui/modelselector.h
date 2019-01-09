@@ -23,39 +23,35 @@
 #include <QQuickItem>
 #include <QObject>
 
-typedef struct
-{
-    quint32 m_ID;
-    QQuickItem *m_item;
-} selectedItem;
+class ListModel;
 
 class ModelSelector : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(int nodesCount READ nodesCount NOTIFY nodesCountChanged)
     Q_PROPERTY(int itemsCount READ itemsCount NOTIFY itemsCountChanged)
 
 public:
     ModelSelector(QObject *parent = 0);
     ~ModelSelector();
 
-    Q_INVOKABLE void selectItem(quint32 id, QQuickItem *item, bool multiSelection);
-    Q_INVOKABLE QVariantList itemsList();
+    /** Add an entry to the selected items list.
+     *  If $multiSelection is false, every previous item in the list will be
+     *  deselected. */
+    Q_INVOKABLE void selectItem(quint32 index, ListModel *model, bool multiSelection);
 
-    int nodesCount() const;
+    Q_INVOKABLE QVariantList itemsList();
+    Q_INVOKABLE void resetSelection();
+
     int itemsCount() const;
 
 signals:
-    void nodesCountChanged(int nodesCount);
     void itemsCountChanged(int itemsCount);
 
 private:
-    /** List of the currently selected items */
-    QList <selectedItem> m_selectedItems;
+    /** List of the currently selected item indices */
+    QList <quint32> m_selectedIndices;
 
-    /** The number of nodes currently selected (e.g. folders) */
-    int m_nodesCount;
     /** The number of items currently selected (e.g. Functions, Fixtures, etc..) */
     int m_itemsCount;
 };

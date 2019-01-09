@@ -17,31 +17,33 @@
   limitations under the License.
 */
 
-import QtQuick 2.2
+import QtQuick 2.10
 
+import org.qlcplus.classes 1.0
 import "CanvasDrawFunctions.js" as DrawFuncs
 import "."
 
 Rectangle
 {
     id: fixtureItem
-    x: (gridCellSize * mmXPos) / gridUnits
-    y: (gridCellSize * mmYPos) / gridUnits
+    x: ((gridCellSize * mmXPos) / gridUnits) + gridPosition.x
+    y: ((gridCellSize * mmYPos) / gridUnits) + gridPosition.y
     z: 2
     width: (gridCellSize * mmWidth) / gridUnits
     height: (gridCellSize * mmHeight) / gridUnits
 
     color: "#2A2A2A"
     border.width: isSelected ? 2 : 1
-    border.color: isSelected ? (isDragging ? "#00FF00" : UISettings.selection) : (isDragging ? "#00FF00" : "#AAA")
+    border.color: isSelected ? UISettings.selection : UISettings.fgLight
 
-    Drag.active: fxMouseArea.drag.active
+    //Drag.active: fxMouseArea.drag.active
 
-    property int fixtureID: fixtureManager.invalidFixture()
+    property int itemID: fixtureManager.invalidFixture()
     property string fixtureName: ""
 
-    property real gridCellSize: parent ? parent.cellSize : 100
-    property int gridUnits: parent ? parent.gridUnits : 1000
+    property real gridCellSize: View2D.cellPixels
+    property real gridUnits: View2D.gridUnits === MonitorProperties.Meters ? 1000.0 : 304.8
+    property point gridPosition: View2D.gridPosition
 
     property real mmXPos: 0
     property real mmYPos: 0
@@ -50,52 +52,76 @@ Rectangle
 
     property int headsNumber: 1
     property real headSide: 10
-    property int headColumns: 1
-    property int headRows: 1
+    property size headsLayout: Qt.size(1, 1)
 
     property int panMaxDegrees: 0
     property int tiltMaxDegrees: 0
 
     property bool isSelected: false
-    property bool isDragging: false
     property bool showLabel: false
 
     onWidthChanged: calculateHeadSize();
     onHeightChanged: calculateHeadSize();
-    onHeadsNumberChanged: calculateHeadSize();
+    //onHeadsNumberChanged: calculateHeadSize();
 
     function calculateHeadSize()
     {
-        var areaSqrt = Math.sqrt((width * height) / headsNumber)
-        var columns = parseInt((width / areaSqrt) + 0.5)
-        var rows = parseInt((height / areaSqrt) + 0.5)
+        var columns, rows
+        if (headsLayout !== Qt.size(1, 1))
+        {
+            columns = headsLayout.width
+            rows = headsLayout.height
+            //console.log("" + fixtureName + ": layout provided - " + columns + "x" + rows)
+        }
+        else
+        {
+            // fallback to guessing based on heads number
+            //console.log("Guessing heads layout...")
+            var areaSqrt = Math.sqrt((width * height) / headsNumber)
+            columns = parseInt((width / areaSqrt) + 0.5)
+            rows = parseInt((height / areaSqrt) + 0.5)
 
-        // dirty workaround to correctly display right columns on one row
-        if (rows === 1) columns = headsNumber
-        if (columns === 1) rows = headsNumber
+            // dirty workaround to correctly display right columns on one row
+            if (rows === 1) columns = headsNumber
+            if (columns === 1) rows = headsNumber
 
-        if (columns > headsNumber)
-            columns = headsNumber
+            if (columns > headsNumber)
+                columns = headsNumber
 
-        if (rows < 1) rows = 1
-        if (columns < 1) columns = 1
-
+            if (rows < 1) rows = 1
+            if (columns < 1) columns = 1
+        }
         var cellWidth = width / columns
         var cellHeight = height / rows
-        headSide = parseInt(Math.min(cellWidth, cellHeight))
-        headColumns = columns
-        headRows = rows
+        headSide = Math.min(cellWidth, cellHeight) - 1
+
+        var hHeadsWidth = headSide * columns
+        var hSpacing = (width - hHeadsWidth) / (columns - 1)
+        headsBox.columnSpacing = parseInt(hSpacing)
+        headsBox.columns = columns
+        headsBox.rows = rows
+        headsBox.width = hHeadsWidth + (hSpacing * (columns - 1))
+        headsBox.height = (headSide + 2) * rows
+        //console.log("size: " + width + " x " + height + ", head size: " + headSide + ", spacing: " + hSpacing)
     }
 
     function setHeadIntensity(headIndex, intensity)
     {
         //console.log("headIdx: " + headIndex + ", int: " + intensity)
-        headsRepeater.itemAt(headIndex).headLevel = intensity
+        headsRepeater.itemAt(headIndex).dimmerValue = intensity
     }
 
-    function setHeadColor(headIndex, color)
+    function setHeadRGBColor(headIndex, color)
     {
-        headsRepeater.itemAt(headIndex).headColor = color
+        var headItem = headsRepeater.itemAt(headIndex)
+        headItem.isWheelColor = false
+        headItem.headColor1 = color
+    }
+
+    function setShutter(type, low, high)
+    {
+        for (var i = 0; i < headsRepeater.count; i++)
+            headsRepeater.itemAt(i).setShutter(type, low, high);
     }
 
     function setPosition(pan, tilt)
@@ -109,6 +135,17 @@ Rectangle
         positionLayer.requestPaint()
     }
 
+    function setWheelColor(headIndex, col1, col2)
+    {
+        var headItem = headsRepeater.itemAt(headIndex)
+        headItem.headColor1 = col1
+        if (col2 !== Qt.rgba(0,0,0,1))
+        {
+            headItem.isWheelColor = true
+            headItem.headColor2 = col2
+        }
+    }
+
     function setGoboPicture(headIndex, resource)
     {
         if (Qt.platform.os === "android")
@@ -117,26 +154,27 @@ Rectangle
             headsRepeater.itemAt(headIndex).goboSource = "file:/" + resource
     }
 
-    Flow
+    Grid
     {
         id: headsBox
-        width: headSide * headColumns
-        height: headSide * headRows
+        //width: headSide * headsLayout.width
+        //height: headSide * headsLayout.height
         anchors.centerIn: parent
 
         Repeater
         {
             id: headsRepeater
-            model: fixtureItem.headsNumber
+            model: headsBox.columns * headsBox.rows // fixtureItem.headsNumber
             delegate:
                 Rectangle
                 {
                     id: headDelegate
-                    property color headColor: "black"
-                    property real headLevel: 0.0
-                    property real whiteLevel: 0.0
-                    property real amberLevel: 0.0
-                    property real uvLevel: 0.0
+                    property real intensity: dimmerValue * shutterValue
+                    property real dimmerValue: 0
+                    property real shutterValue: sAnimator.shutterValue
+                    property bool isWheelColor: false
+                    property color headColor1: "black"
+                    property color headColor2: "black"
                     property string goboSource: ""
 
                     width: fixtureItem.headSide
@@ -146,45 +184,28 @@ Rectangle
                     border.width: 1
                     border.color: "#AAA"
 
-                    Rectangle
+                    function setShutter(type, low, high)
                     {
-                        id: headMainLayer
+                        sAnimator.setShutter(type, low, high)
+                    }
+
+                    ShutterAnimator { id: sAnimator }
+
+                    MultiColorBox
+                    {
                         x: 1
                         y: 1
                         width: parent.width - 2
                         height: parent.height - 2
                         radius: parent.radius - 2
-                        color: headDelegate.headColor
-                        opacity: headDelegate.headLevel
-
-                        Rectangle
-                        {
-                            id: headWhiteLayer
-                            anchors.fill: parent
-                            radius: parent.radius
-                            color: "white"
-                            opacity: headDelegate.whiteLevel
-                        }
-                        Rectangle
-                        {
-                            id: headAmberLayer
-                            anchors.fill: parent
-                            radius: parent.radius
-                            color: "#FF7E00"
-                            opacity: headDelegate.amberLevel
-                        }
-                        Rectangle
-                        {
-                            id: headUVLayer
-                            anchors.fill: parent
-                            radius: parent.radius
-                            color: "#9400D3"
-                            opacity: headDelegate.uvLevel
-                        }
+                        opacity: headDelegate.intensity
+                        biColor: headDelegate.isWheelColor
+                        primary: headDelegate.headColor1
+                        secondary: headDelegate.headColor2
                     }
+
                     Image
                     {
-                        id: headGoboLayer
                         anchors.fill: parent
                         sourceSize: Qt.size(parent.width, parent.height)
                         source: headDelegate.goboSource
@@ -198,6 +219,7 @@ Rectangle
         id: positionLayer
         anchors.fill: parent
         visible: (panMaxDegrees || tiltMaxDegrees) ? true : false
+        contextType: "2d"
 
         property int panDegrees: 0
         property int tiltDegrees: 0
@@ -208,43 +230,42 @@ Rectangle
 
         onPaint:
         {
+            var context = getContext("2d")
             if (positionLayer.visible == false)
                 return;
 
-            var ctx = positionLayer.getContext('2d');
-            //ctx.save();
-            ctx.globalAlpha = 0.7;
-            ctx.lineWidth = 1;
+            context.globalAlpha = 0.7;
+            context.lineWidth = 1;
 
-            ctx.clearRect(0, 0, width, height)
+            context.clearRect(0, 0, width, height)
 
             if (tiltMaxDegrees)
             {
                 // draw TILT curve
-                ctx.strokeStyle = "#2E77FF";
-                DrawFuncs.drawEllipse(ctx, width / 2, height / 2, tiltWidth, height)
+                context.strokeStyle = "#2E77FF";
+                DrawFuncs.drawEllipse(context, width / 2, height / 2, tiltWidth, height)
             }
             if (panMaxDegrees)
             {
                 // draw PAN curve
-                ctx.strokeStyle = "#19438F"
-                DrawFuncs.drawEllipse(ctx, width / 2, height / 2, width, panHeight)
+                context.strokeStyle = "#19438F"
+                DrawFuncs.drawEllipse(context, width / 2, height / 2, width, panHeight)
             }
 
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = "white";
+            context.lineWidth = 1;
+            context.strokeStyle = "white";
 
             if (tiltMaxDegrees)
             {
                 // draw TILT cursor position
-                ctx.fillStyle = "red";
-                DrawFuncs.drawCursor(ctx, width / 2, height / 2, tiltWidth, height, tiltDegrees + 135, cursorRadius)
+                context.fillStyle = "red";
+                DrawFuncs.drawCursor(context, width / 2, height / 2, tiltWidth, height, tiltDegrees + 135, cursorRadius)
             }
             if (panMaxDegrees)
             {
                 // draw PAN cursor position
-                ctx.fillStyle = "green";
-                DrawFuncs.drawCursor(ctx, width / 2, height / 2, width, panHeight, panDegrees + 90, cursorRadius)
+                context.fillStyle = "green";
+                DrawFuncs.drawCursor(context, width / 2, height / 2, width, panHeight, panDegrees + 90, cursorRadius)
             }
         }
     }
@@ -255,19 +276,18 @@ Rectangle
         y: parent.height + 2
         x: -10
         width: parent.width + 20
-        height: 28
+        height: UISettings.listItemHeight
         color: "#444"
         visible: showLabel
 
         RobotoText
         {
-            width: parent.width
-            height: parent.height
+            anchors.fill: parent
             label: fixtureName
             //labelColor: "black"
-            fontSize: 8
+            fontSize: UISettings.textSizeDefault / 2
             wrapText: true
-            textAlign: Text.AlignHCenter
+            textHAlign: Text.AlignHCenter
         }
     }
 
@@ -276,33 +296,15 @@ Rectangle
         id: fxMouseArea
         anchors.fill: parent
         hoverEnabled: true
-        preventStealing: false
+        propagateComposedEvents: true
 
         onEntered: fixtureLabel.visible = true
         onExited: showLabel ? fixtureLabel.visible = true : fixtureLabel.visible = false
 
-        onPressAndHold:
+        onPressed:
         {
-            drag.target = fixtureItem
-            isDragging = true
-            console.log("drag started");
-        }
-        onReleased:
-        {
-            if (drag.target !== null)
-            {
-                console.log("drag finished");
-                mmXPos = (fixtureItem.x * gridUnits) / gridCellSize;
-                mmYPos = (fixtureItem.y * gridUnits) / gridCellSize;
-                contextManager.setFixturePosition(fixtureID, mmXPos, mmYPos)
-                drag.target = null
-                isDragging = false
-            }
-        }
-        onClicked:
-        {
-            isSelected = !isSelected
-            contextManager.setFixtureSelection(fixtureID, isSelected)
+            // do not accept this event to propagate it to the drag rectangle
+            mouse.accepted = false
         }
     }
 }

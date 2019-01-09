@@ -1,7 +1,7 @@
 /*
   Q Light Controller Plus
   empty.js
-  
+
   Copyright (c) Your Name
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,16 +39,17 @@ var testAlgo;
       */
     algo.rgbMap = function(width, height, rgb, step)
     {
-	var map = new Array(height);
-	for (var y = 0; y < height; y++)
-	{
-	    map[y] = new Array();
-	    for (var x = 0; x < width; x++)
-	      map[y][x] = 0; // <-- elapsed color goes here
-	}
+      var map = new Array(height);
+      for (var y = 0; y < height; y++)
+      {
+        map[y] = new Array();
+        for (var x = 0; x < width; x++) {
+          map[y][x] = 0; // <-- elapsed color goes here
+        }
+      }
 
-	return map;
-    }
+      return map;
+    };
 
     /**
       * Tells RGB Matrix how many steps this algorithm produces with size($width, $height)
@@ -59,12 +60,12 @@ var testAlgo;
       */
     algo.rgbMapStepCount = function(width, height)
     {
-         return width;
-    }
+      return width;
+    };
 
     // Development tool access
     testAlgo = algo;
 
     return algo;
-    }
-)()
+  }
+)();

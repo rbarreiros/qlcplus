@@ -23,13 +23,14 @@
 #include "vcwidget.h"
 
 #define KXMLQLCVCFrame "Frame"
-#define KXMLQLCVCFrameAllowChildren "AllowChildren"
+#define KXMLQLCVCFrameAllowChildren "AllowChildren"  // LEGACY
 #define KXMLQLCVCFrameAllowResize   "AllowResize"
 #define KXMLQLCVCFrameShowHeader    "ShowHeader"
 #define KXMLQLCVCFrameIsCollapsed   "Collapsed"
 #define KXMLQLCVCFrameIsDisabled    "Disabled"
 #define KXMLQLCVCFrameEnableSource  "Enable"
 #define KXMLQLCVCFrameShowEnableButton "ShowEnableButton"
+#define KXMLQLCVCFrameSignature     "Signature"
 
 #define KXMLQLCVCFrameMultipage   "Multipage"
 #define KXMLQLCVCFramePagesNumber "PagesNum"
@@ -49,33 +50,39 @@ class VCFrame : public VCWidget
     Q_PROPERTY(bool showEnable READ showEnable WRITE setShowEnable NOTIFY showEnableChanged)
     Q_PROPERTY(bool isCollapsed READ isCollapsed WRITE setCollapsed NOTIFY collapsedChanged)
     Q_PROPERTY(bool multiPageMode READ multiPageMode WRITE setMultiPageMode NOTIFY multiPageModeChanged)
+    Q_PROPERTY(bool pagesLoop READ pagesLoop WRITE setPagesLoop NOTIFY pagesLoopChanged)
     Q_PROPERTY(int currentPage READ currentPage NOTIFY currentPageChanged)
+    Q_PROPERTY(int totalPagesNumber READ totalPagesNumber WRITE setTotalPagesNumber NOTIFY totalPagesNumberChanged)
 
     /*********************************************************************
      * Initialization
      *********************************************************************/
-
 public:
-    VCFrame(Doc* doc = NULL, VirtualConsole *vc = NULL, QObject *parent = 0);
+    VCFrame(Doc* doc = nullptr, VirtualConsole *vc = nullptr, QObject *parent = nullptr);
     virtual ~VCFrame();
 
+    /** @reimp */
+    virtual QString defaultCaption();
+
+    /** @reimp */
+    void setupLookAndFeel(qreal pixelDensity, int page);
+
+    /** @reimp */
     virtual void render(QQuickView *view, QQuickItem *parent);
 
-    /** Method used to indicate if this Frame has a SoloFrame parent
-     *  at any lower level. This is used to determine if
-     *  children widget should be connected to handle the Solo Frame
-     *  feature */
-    void setHasSoloParent(bool hasSoloParent);
+    /** @reimp */
+    QString propertiesResource() const;
 
-    /** Returns if this Frame has a Solo Frame parent at any lower level */
-    bool hasSoloParent() const;
+    /** @reimp */
+    VCWidget *createCopy(VCWidget *parent);
+
+protected:
+    /** @reimp */
+    bool copyFrom(const VCWidget* widget);
 
 protected:
     /** Reference to the Virtual Console, used to add new widgets */
     VirtualConsole *m_vc;
-
-    /** Flag that holds if this frame has a Solo parent widget */
-    bool m_hasSoloParent;
 
     /*********************************************************************
      * Children
@@ -84,15 +91,66 @@ public:
     /** Returns if this frame has chidren widgets */
     bool hasChildren();
 
+    /** Returns a list of the children widgets with the specified
+     *  $recursive method */
     QList<VCWidget *>children(bool recursive = false);
 
+    /** Add a new widget of type $wType at position $pos to this frame.
+     *  $parent is used only to render the new widget */
     Q_INVOKABLE void addWidget(QQuickItem *parent, QString wType, QPoint pos);
 
+    /** Add an existing widget at position $pos to this frame.
+     *  $parent is used only to render the new widget */
+    void addWidget(QQuickItem *parent, VCWidget *widget, QPoint pos);
+
+    /** Add a matrix of widgets with the specified parameters:
+     *
+     *  @param parent the parent item to render the matrix
+     *  @param matrixType is the type of matrix (buttons, sliders)
+     *  @param pos the matrix position within this frame
+     *  @param matrixSize the matrix size (columns x rows)
+     *  @param widgetSize the individual widget size in pixel
+     *  @param soloFrame the type of Frame to create as container for the widget matrix
+     */
+    Q_INVOKABLE void addWidgetMatrix(QQuickItem *parent, QString matrixType, QPoint pos,
+                                     QSize matrixSize, QSize widgetSize, bool soloFrame = false);
+
+    /** Add a list of widgets previously copied to the VC clipboard
+     *
+     *  @param parent the parent item to render the matrix
+     *  @param idsList a list of VC widget IDs
+     *  @param pos the matrix position within this frame
+     */
+    Q_INVOKABLE void addWidgetsFromClipboard(QQuickItem *parent, QVariantList idsList, QPoint pos);
+
+    /** Add all the Functions IDs in $idsList at position $pos to this frame.
+     *  $keyModifiers determines the type of widget to create:
+     *      Shift: VC Slider in Adjust mode controlling intensity
+     *      Ctrl: VC Cue List (only when dropping Chasers)
+     *      None: VC Button
+     *  $parent is used only to render the new widget */
+    Q_INVOKABLE void addFunctions(QQuickItem *parent, QVariantList idsList, QPoint pos, int keyModifiers);
+
+    /** Delete all the frame children */
     void deleteChildren();
 
+    /** Add a child widget to the frame page map */
+    virtual void addWidgetToPageMap(VCWidget *widget);
+
+    /** Remove the child $widget from the frame page map */
+    virtual void removeWidgetFromPageMap(VCWidget *widget);
+
 protected:
-    void setupWidget(VCWidget *widget);
-    void deleteWidget(VCWidget *widget);
+    void setupWidget(VCWidget *widget, int page);
+
+    void checkSubmasterConnection(VCWidget *widget);
+
+    /*********************************************************************
+     * Disable state
+     *********************************************************************/
+public:
+    /** @reimp */
+    void setDisabled(bool disable);
 
     /*********************************************************************
      * Header
@@ -161,7 +219,9 @@ public:
 
 signals:
     void multiPageModeChanged(bool multiPageMode);
+    void pagesLoopChanged(bool loop);
     void currentPageChanged(int page);
+    void totalPagesNumberChanged(int num);
 
 protected:
     /** Flag to enable/disable multiple pages on this frame */
@@ -173,8 +233,8 @@ protected:
     /** Flag to cycle through pages when reaching the end */
     bool m_pagesLoop;
 
-    /** Here's where the magic takes place. This holds a map
-     *  of pages/widgets to be shown/hidden when page is changed */
+    /** This holds a map of pages/widgets to be
+     *  shown/hidden when page is changed */
     QMap <VCWidget *, int> m_pagesMap;
 
     /*********************************************************************
@@ -184,12 +244,26 @@ protected slots:
     virtual void slotFunctionStarting(VCWidget *widget, quint32 fid, qreal fIntensity = 1.0);
 
     /*********************************************************************
+     * Submasters
+     *********************************************************************/
+protected slots:
+    void slotSubmasterValueChanged(qreal value);
+
+    /*********************************************************************
+     * External input
+     *********************************************************************/
+public slots:
+    /** @reimp */
+    void slotInputValueChanged(quint8 id, uchar value);
+
+    /*********************************************************************
      * Load & Save
      *********************************************************************/
 
 public:
+    bool loadWidgetXML(QXmlStreamReader &root, bool render = false);
     bool loadXML(QXmlStreamReader &root);
-    //bool saveXML(QXmlStreamWriter *doc, bool mainFrame = false);
+    bool saveXML(QXmlStreamWriter *doc);
 
 protected:
     /** Can be overridden by subclasses */

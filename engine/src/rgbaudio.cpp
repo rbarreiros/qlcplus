@@ -29,6 +29,7 @@ RGBAudio::RGBAudio(Doc * doc)
     : RGBAlgorithm(doc)
     , m_audioInput(NULL)
     , m_bandsNumber(-1)
+    , m_maxMagnitude(0)
 {
 }
 
@@ -37,6 +38,7 @@ RGBAudio::RGBAudio(const RGBAudio& a, QObject *parent)
     , RGBAlgorithm(a.doc())
     , m_audioInput(NULL)
     , m_bandsNumber(-1)
+    , m_maxMagnitude(0)
 {
 }
 
@@ -85,7 +87,7 @@ void RGBAudio::calculateColors(int barsHeight)
     if (barsHeight > 0)
     {
         m_barColors.clear();
-        if (endColor() == QColor() 
+        if (endColor() == QColor()
             || barsHeight == 1) // to avoid division by 0 below
         {
             for (int i = 0; i < barsHeight; i++)

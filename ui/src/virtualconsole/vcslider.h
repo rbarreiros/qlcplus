@@ -49,12 +49,12 @@ class VCSliderProperties;
 #define KXMLQLCVCSliderValueDisplayStyle "ValueDisplayStyle"
 #define KXMLQLCVCSliderValueDisplayStyleExact "Exact"
 #define KXMLQLCVCSliderValueDisplayStylePercentage "Percentage"
+#define KXMLQLCVCSliderCatchValues "CatchValues"
 
 #define KXMLQLCVCSliderClickAndGoType "ClickAndGoType"
 
 #define KXMLQLCVCSliderInvertedAppearance "InvertedAppearance"
 
-#define KXMLQLCVCSliderBus "Bus"
 #define KXMLQLCVCSliderBusLowLimit "LowLimit"
 #define KXMLQLCVCSliderBusHighLimit "HighLimit"
 
@@ -63,6 +63,7 @@ class VCSliderProperties;
 #define KXMLQLCVCSliderLevelHighLimit "HighLimit"
 #define KXMLQLCVCSliderLevelValue "Value"
 #define KXMLQLCVCSliderLevelMonitor "Monitor"
+#define KXMLQLCVCSliderOverrideReset "Reset"
 
 #define KXMLQLCVCSliderChannel "Channel"
 #define KXMLQLCVCSliderChannelFixture "Fixture"
@@ -78,6 +79,9 @@ class VCSlider : public VCWidget, public DMXSource
     friend class VCSliderProperties;
 
 public:
+    static const quint8 sliderInputSourceId;
+    static const quint8 overrideResetInputSourceId;
+
     static const QSize defaultSize;
 
     /*********************************************************************
@@ -85,7 +89,7 @@ public:
      *********************************************************************/
 public:
     /** Normal constructor */
-    VCSlider(QWidget* parent, Doc* doc);
+    VCSlider(QWidget *parent, Doc *doc);
 
     /** Destructor */
     ~VCSlider();
@@ -102,11 +106,11 @@ public:
      *********************************************************************/
 public:
     /** Create a copy of this widget into the given parent */
-    VCWidget* createCopy(VCWidget* parent);
+    VCWidget *createCopy(VCWidget *parent);
 
 protected:
     /** Copy the contents for this widget from another widget */
-    bool copyFrom(const VCWidget* widget);
+    bool copyFrom(const VCWidget *widget);
 
     /*********************************************************************
      * GUI
@@ -116,6 +120,10 @@ public:
 
     /** @reimp */
     void enableWidgetUI(bool enable);
+
+protected:
+    /** @reimp */
+    void hideEvent(QHideEvent *ev);
 
     /*********************************************************************
      * Properties
@@ -198,6 +206,16 @@ public:
     bool invertedAppearance() const;
     void setInvertedAppearance(bool invert);
 
+    /*********************************************************************
+     * Value catching feature
+     *********************************************************************/
+public:
+    bool catchValues() const;
+    void setCatchValues(bool enable);
+
+protected:
+    bool m_catchValues;
+
     /*************************************************************************
      * Class LevelChannel
      *************************************************************************/
@@ -262,27 +280,27 @@ public:
     QList <VCSlider::LevelChannel> levelChannels();
 
     /**
-     * Set low limit for levels set thru the slider
+     * Set low limit for levels set through the slider
      *
      * @param value Low limit
      */
     void setLevelLowLimit(uchar value);
 
     /**
-     * Get low limit for levels set thru the slider
+     * Get low limit for levels set through the slider
      *
      */
     uchar levelLowLimit() const;
 
     /**
-     * Set high limit for levels set thru the slider
+     * Set high limit for levels set through the slider
      *
      * @param value High limit
      */
     void setLevelHighLimit(uchar value);
 
     /**
-     * Get high limit for levels set thru the slider
+     * Get high limit for levels set through the slider
      */
     uchar levelHighLimit() const;
 
@@ -303,18 +321,12 @@ protected:
      *
      * @param value DMX value
      */
-    void setLevelValue(uchar value);
+    void setLevelValue(uchar value, bool external = false);
 
     /**
      * Get the current "level" mode value
      */
     uchar levelValue() const;
-
-public:
-    /**
-     * Send submasterValueChanged signal
-     */
-    void emitSubmasterValue();
 
 signals:
     void monitorDMXValueChanged(int value);
@@ -326,6 +338,8 @@ protected slots:
     /** Slot called when the DMX levels of the controlled channels
      *  has changed */
     void slotMonitorDMXValueChanged(int value);
+
+    void slotUniverseWritten(quint32 idx, const QByteArray& universeData);
 
 protected:
     QList <VCSlider::LevelChannel> m_levelChannels;
@@ -360,18 +374,18 @@ public:
     quint32 playbackFunction() const;
 
     /**
-     * Set the level of the currently selected playback function.
-     *
-     * @param level The current playback function's level.
-     */
-    void setPlaybackValue(uchar value);
-
-    /**
      * Get the level of the currently selected playback function.
      *
      * @return The current playback function level.
      */
     uchar playbackValue() const;
+
+    /**
+     * Set the level of the currently selected playback function.
+     *
+     * @param level The current playback function's level.
+     */
+    void setPlaybackValue(uchar value);
 
     /** @reimp */
     virtual void notifyFunctionStarting(quint32 fid, qreal intensity);
@@ -380,11 +394,12 @@ protected slots:
     void slotPlaybackFunctionRunning(quint32 fid);
     void slotPlaybackFunctionStopped(quint32 fid);
     void slotPlaybackFunctionIntensityChanged(int attrIndex, qreal fraction);
+    void slotPlaybackFunctionFlashing(quint32 fid, bool flashing);
 
 protected:
     quint32 m_playbackFunction;
     uchar m_playbackValue;
-    bool m_playbackValueChanged;
+    int m_playbackChangeCounter;
     QMutex m_playbackValueMutex;
 
 private:
@@ -393,6 +408,12 @@ private:
     /*********************************************************************
      * Submaster
      *********************************************************************/
+public:
+    /**
+     * Send submasterValueChanged signal
+     */
+    void emitSubmasterValue();
+
 signals:
     void submasterValueChanged(qreal value);
 
@@ -401,14 +422,18 @@ signals:
      *********************************************************************/
 public:
     /** @reimpl */
-    void writeDMX(MasterTimer* timer, QList<Universe*> universes);
+    void writeDMX(MasterTimer *timer, QList<Universe*> universes);
 
 protected:
     /** writeDMX for Level mode */
-    void writeDMXLevel(MasterTimer* timer, QList<Universe*> universes);
+    void writeDMXLevel(MasterTimer *timer, QList<Universe*> universes);
 
     /** writeDMX for Playback mode */
-    void writeDMXPlayback(MasterTimer* timer, QList<Universe*> universes);
+    void writeDMXPlayback(MasterTimer *timer, QList<Universe*> universes);
+
+private:
+    /** Map used to lookup a GenericFader instance for a Universe ID */
+    QMap<quint32, GenericFader *> m_fadersMap;
 
     /*********************************************************************
      * Top label
@@ -425,7 +450,7 @@ public:
     QString topLabelText();
 
 protected:
-    QLabel* m_topLabel;
+    QLabel *m_topLabel;
 
     /*********************************************************************
      * Slider / Knob
@@ -438,7 +463,9 @@ public:
     };
 
 public:
-    void setSliderValue(uchar value, bool noScale = false);
+    void setSliderValue(uchar value, bool scale = true, bool external = false);
+
+    void setSliderShadowValue(int value);
 
     int sliderValue() const;
 
@@ -452,12 +479,16 @@ public:
 
     void updateFeedback();
 
+signals:
+    void requestSliderUpdate(int value);
+    void valueChanged(QString val);
+
 private slots:
     void slotSliderMoved(int value);
 
 protected:
-    QHBoxLayout* m_hbox;
-    QAbstractSlider* m_slider; //!< either QClickAndGoSlider or KnobWidget
+    QHBoxLayout *m_hbox;
+    QAbstractSlider *m_slider; //!< either ClickAndGoSlider or KnobWidget
     bool m_externalMovement;
     SliderWidgetStyle m_widgetMode;
 
@@ -476,7 +507,7 @@ public:
     QString bottomLabelText();
 
 protected:
-    QLabel* m_bottomLabel;
+    QLabel *m_bottomLabel;
 
     /*********************************************************************
      * Click & Go Button
@@ -522,11 +553,37 @@ protected:
     QColor m_cngRGBvalue;
 
     /*********************************************************************
+     * Override reset button
+     *********************************************************************/
+public:
+    /** Set the keyboard key combination to reset a level override */
+    void setOverrideResetKeySequence(const QKeySequence& keySequence);
+
+    /** Get the keyboard key combination to reset a level override */
+    QKeySequence overrideResetKeySequence() const;
+
+private slots:
+    void slotResetButtonClicked();
+
+protected slots:
+    void slotKeyPressed(const QKeySequence& keySequence);
+
+protected:
+    QToolButton *m_resetButton;
+    bool m_isOverriding;
+
+private:
+    QKeySequence m_overrideResetKeySequence;
+
+    /*********************************************************************
      * External input
      *********************************************************************/
 protected slots:
     /** Called when an external input device produces input data */
     void slotInputValueChanged(quint32 universe, quint32 channel, uchar value);
+
+protected:
+    int m_lastInputValue;
 
     /*********************************************************************
      * Intensity
@@ -534,9 +591,6 @@ protected slots:
 public:
     /** @reimp */
     void adjustIntensity(qreal val);
-
-signals:
-    void valueChanged(QString val);
 
     /*********************************************************************
      * Load & Save

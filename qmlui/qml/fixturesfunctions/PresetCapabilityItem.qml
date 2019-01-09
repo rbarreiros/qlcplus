@@ -18,13 +18,15 @@
 */
 
 import QtQuick 2.0
-import com.qlcplus.classes 1.0
+
+import org.qlcplus.classes 1.0
+import "."
 
 Rectangle
 {
     id: iRoot
-    width: 180
-    height: 64
+    width: UISettings.bigItemHeight * 1.5
+    height: UISettings.iconSizeDefault * 1.2
 
     border.width: 1
     border.color: "#111"
@@ -37,39 +39,42 @@ Rectangle
     onCapabilityChanged:
     {
         if (capability === null)
-            return;
+            return
 
-        if (capability.resourceColor1 != "#000000")
+        var resArray = capability.resources
+        capName.label = capability.name
+
+        if (resArray.length === 0)
         {
-            col1.color = capability.resourceColor1
-            col2.color = capability.resourceColor1
+            capIdx.label = capIndex.toString()
+            return
         }
 
-        if (capability.resourceColor2 != "#000000")
-            col2.color = capability.resourceColor2
+        if (resArray[0].toString().startsWith('#'))
+        {
+            col1.color = resArray[0]
+            col2.color = resArray[0]
 
-        //console.log("Capability res name: " + capability.resourceName)
-        if (capability.resourceName)
+            if (resArray.length > 1 && resArray[1].toString().startsWith('#'))
+                col2.color = resArray[1]
+        }
+        else if (resArray[0].indexOf('.') !== -1)
         {
             if (Qt.platform.os === "android")
-                pic.source = capability.resourceName
+                pic.source = resArray[0]
             else
-                pic.source = "file:/" + capability.resourceName
+                pic.source = "file:/" + resArray[0]
         }
-        if (capability.resourceColor1 == "#000000" &&
-            capability.resourceColor2 == "#000000" &&
-            capability.resourceName == "")
-                capIdx.label = capIndex.toString()
-
-        capName.label = capability.name
     }
 
     Row
     {
+        spacing: 5
+
         Rectangle
         {
-            width: 64
-            height: 64
+            width: UISettings.iconSizeDefault
+            height: width
             border.width: 1
             border.color: "#111"
 
@@ -78,17 +83,17 @@ Rectangle
                 id: col1
                 x: 1
                 y: 1
-                width: 31
-                height: 62
+                width: parent.width / 2
+                height: parent.height - 2
                 color: "transparent"
             }
             Rectangle
             {
                 id: col2
-                x: 32
+                x: parent.width / 2
                 y: 1
-                width: 31
-                height: 62
+                width: parent.width / 2
+                height: parent.height - 2
                 color: "transparent"
             }
             RobotoText
@@ -113,11 +118,11 @@ Rectangle
         RobotoText
         {
             id: capName
-            width: iRoot.width - 64
+            width: iRoot.width - UISettings.iconSizeDefault
             height: iRoot.height
             //label: ""
             labelColor: "black"
-            fontSize: 10
+            fontSize: UISettings.textSizeDefault * 0.75
             wrapText: true
         }
     }

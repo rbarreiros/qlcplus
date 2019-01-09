@@ -28,6 +28,7 @@
 #include <QHash>
 
 #include "qlcchannel.h"
+#include "qlcfixturedef.h"
 
 class QString;
 
@@ -36,7 +37,6 @@ class ChannelModifier;
 class QLCFixtureMode;
 class QLCFixtureHead;
 class FixtureConsole;
-class QLCFixtureDef;
 class Doc;
 
 /** @addtogroup engine Engine
@@ -60,6 +60,12 @@ class Doc;
 #define KXMLFixtureChannelIndex "Channel"
 #define KXMLFixtureModifierName "Name"
 
+typedef struct
+{
+    bool m_hasAlias;        /** Flag to enable/disable aliases check */
+    QLCCapability *m_currCap; /** The current capability in use */
+} ChannelAlias;
+
 class Fixture : public QObject
 {
     Q_OBJECT
@@ -67,7 +73,7 @@ class Fixture : public QObject
 
     Q_PROPERTY(quint32 id READ id CONSTANT)
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY changed)
-    Q_PROPERTY(QString type READ type CONSTANT)
+    Q_PROPERTY(int type READ type CONSTANT)
     Q_PROPERTY(quint32 universe READ universe WRITE setUniverse NOTIFY changed)
     Q_PROPERTY(quint32 address READ address WRITE setAddress NOTIFY changed)
     Q_PROPERTY(quint32 channels READ channels WRITE setChannels NOTIFY changed)
@@ -151,7 +157,9 @@ public:
      *
      * @return Fixture type
      */
-    QString type();
+    QString typeString();
+
+    QLCFixtureDef::FixtureType type() const;
 
     /*********************************************************************
      * Universe
@@ -255,19 +263,10 @@ public:
                     QLCChannel::PrimaryColour color = QLCChannel::NoColour) const;
 
     /** @see QLCFixtureHead */
-    quint32 panMsbChannel(int head = 0) const;
+    quint32 channelNumber(int type, int controlByte, int head = 0) const;
 
-    /** @see QLCFixtureHead */
-    quint32 tiltMsbChannel(int head = 0) const;
-
-    /** @see QLCFixtureHead */
-    quint32 panLsbChannel(int head = 0) const;
-
-    /** @see QLCFixtureHead */
-    quint32 tiltLsbChannel(int head = 0) const;
-
-    /** @see QLCFixtureHead */
-    quint32 masterIntensityChannel(int head = 0) const;
+    /** @see QLCFixtureMode */
+    quint32 masterIntensityChannel() const;
 
     /** @see QLCFixtureHead */
     QVector <quint32> rgbChannels(int head = 0) const;
@@ -332,12 +331,12 @@ protected:
     QHash<quint32, ChannelModifier*> m_channelModifiers;
 
     /*********************************************************************
-     * Channel values
+     * Channel info
      *********************************************************************/
 public:
     /** Store DMX values for this fixture. If values have changed,
      * it returns true, otherwise false */
-    bool setChannelValues(QByteArray values);
+    bool setChannelValues(const QByteArray &values);
 
     /** Return the current DMX values of this fixture */
     QByteArray channelValues();
@@ -345,12 +344,19 @@ public:
     /** Retrieve the DMX value of the given channel index */
     uchar channelValueAt(int idx);
 
+    /** Check if some alias has changed on channel $chIndex for $value */
+    void checkAlias(int chIndex, uchar value);
+
 signals:
     void valuesChanged();
+    void aliasChanged();
 
 protected:
+    /** Runtime array to store DMX values and check for changes */
     QByteArray m_values;
-    QMutex m_valuesMutex;
+    /** Runtime array to check for alias changes */
+    QVector<ChannelAlias> m_aliasInfo;
+    QMutex m_channelsInfoMutex;
 
     /*********************************************************************
      * Fixture definition
@@ -400,7 +406,9 @@ public:
      */
     QLCFixtureHead head(int index) const;
 
-    QIcon getIconFromType(QString type) const;
+    Q_INVOKABLE QString iconResource(bool svg = false) const;
+
+    QIcon getIconFromType() const;
 
     QRectF degreesRange(int head) const;
 
@@ -431,8 +439,12 @@ public:
         BRG,
         GBR,
         GRB,
-        RGBW
+        RGBW,
+        RBG
     };
+#if QT_VERSION >= 0x050500
+    Q_ENUM(Components)
+#endif
 
 public:
     /** Creates and returns a definition for a generic RGB panel row */

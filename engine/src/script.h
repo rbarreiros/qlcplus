@@ -45,6 +45,7 @@ class Script : public Function
 public:
     static const QString startFunctionCmd;
     static const QString stopFunctionCmd;
+    static const QString blackoutCmd;
 
     static const QString waitCmd;
     static const QString waitKeyCmd;
@@ -55,6 +56,9 @@ public:
     static const QString labelCmd;
     static const QString jumpCmd;
 
+    static const QString blackoutOn;
+    static const QString blackoutOff;
+
     /************************************************************************
      * Initialization
      ************************************************************************/
@@ -62,17 +66,20 @@ public:
     Script(Doc* doc);
     virtual ~Script();
 
-    /** @reimpl */
+    /** @reimp */
+    QIcon getIcon() const;
+
+    /** @reimp */
     quint32 totalDuration();
 
     /************************************************************************
      * Copying
      ************************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     Function* createCopy(Doc* doc, bool addToDoc = true);
 
-    /** @reimpl */
+    /** @reimp */
     bool copyFrom(const Function* function);
 
     /************************************************************************
@@ -91,6 +98,14 @@ public:
     /** Get the script data lines as a list of  strings */
     QStringList dataLines() const;
 
+    /** Convenience method to retrieve Functions used by this Script.
+     *  The returned list is formatted as: Function ID / line number */
+    QList<quint32> functionList() const;
+
+    /** Convenience method to retrieve Fixtures used by this Script.
+     *  The returned list is formatted as: Fixture ID / line number */
+    QList<quint32> fixtureList() const;
+
     QList<int> syntaxErrorsLines();
 
 private:
@@ -100,24 +115,24 @@ private:
      * Load & Save
      ************************************************************************/
 public:
-    /** @reimpl */
+    /** @reimp */
     bool loadXML(QXmlStreamReader &root);
 
-    /** @reimpl */
+    /** @reimp */
     bool saveXML(QXmlStreamWriter *doc);
 
     /************************************************************************
      * Running
      ************************************************************************/
 public:
-    /** @reimpl */
-    void preRun(MasterTimer* timer);
+    /** @reimp */
+    void preRun(MasterTimer *timer);
 
-    /** @reimpl */
-    void write(MasterTimer* timer, QList<Universe*> universes);
+    /** @reimp */
+    void write(MasterTimer *timer, QList<Universe*> universes);
 
-    /** @reimpl */
-    void postRun(MasterTimer* timer, QList<Universe*> universes);
+    /** @reimp */
+    void postRun(MasterTimer *timer, QList<Universe*> universes);
 
 private:
     /**
@@ -129,7 +144,7 @@ private:
      * @return true to continue loop immediately, false to return control back
      *         to MasterTimer.
      */
-    bool executeCommand(int index, MasterTimer* timer, QList<Universe*> universes);
+    bool executeCommand(int index, MasterTimer *timer, QList<Universe*> universes);
 
     /**
      * Check, if the script should still wait or if it should proceed to executing
@@ -145,7 +160,7 @@ private:
      *
      * @return the randomized value requested
      */
-    quint32 getValueFromString(QString str, bool *ok);
+    static quint32 getValueFromString(QString str, bool *ok);
 
     /**
      * Handle "startfunction" command.
@@ -163,6 +178,14 @@ private:
      * @return An empty string if successful. Otherwise an error string.
      */
     QString handleStopFunction(const QList<QStringList>& tokens);
+
+    /**
+     * Handle "blackout" command.
+     *
+     * @param tokens A list of keyword:value pairs
+     * @return An empty string if successful. Otherwise an error string.
+     */
+    QString handleBlackout(const QList<QStringList>& tokens);
 
     /**
      * Handle "wait" command.
@@ -222,9 +245,6 @@ private:
      * @return A list of tokens parsed from the line
      */
     static QList <QStringList> tokenizeLine(const QString& line, bool* ok = NULL);
-
-    /** Get the script's GenericFader (and create it if necessary) */
-    GenericFader* fader();
 
 private:
     int m_currentCommand;        //! Current command line being handled

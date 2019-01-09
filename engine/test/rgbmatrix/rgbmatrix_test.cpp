@@ -22,6 +22,7 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
+#define protected public
 #define private public
 #include "rgbscriptscache.h"
 #include "rgbmatrix_test.h"
@@ -34,6 +35,7 @@
 #include "qlcfile.h"
 #include "doc.h"
 #undef private
+#undef protected
 
 #include "../common/resource_paths.h"
 
@@ -78,12 +80,12 @@ void RGBMatrix_Test::cleanupTestCase()
 void RGBMatrix_Test::initial()
 {
     RGBMatrix mtx(m_doc);
-    QCOMPARE(mtx.type(), Function::RGBMatrix);
+    QCOMPARE(mtx.type(), Function::RGBMatrixType);
     QCOMPARE(mtx.fixtureGroup(), FixtureGroup::invalidId());
     QCOMPARE(mtx.startColor(), QColor(Qt::red));
     QCOMPARE(mtx.endColor(), QColor());
-    QVERIFY(mtx.m_fader == NULL);
-    QCOMPARE(mtx.m_step, 0);
+    QCOMPARE(mtx.m_fadersMap.count(), 0);
+    QCOMPARE(mtx.m_stepHandler->currentStepIndex(), 0);
     QCOMPARE(mtx.name(), tr("New RGB Matrix"));
     QCOMPARE(mtx.duration(), uint(500));
     QVERIFY(mtx.algorithm() != NULL);
@@ -141,25 +143,26 @@ void RGBMatrix_Test::copy()
 void RGBMatrix_Test::previewMaps()
 {
     RGBMatrix mtx(m_doc);
+    RGBMatrixStep handler;
     QVERIFY(mtx.algorithm() != NULL);
     QCOMPARE(mtx.algorithm()->name(), QString("Stripes"));
 
     int steps = mtx.stepsCount();
     QCOMPARE(steps, 0);
 
-    RGBMap map = mtx.previewMap(0);
+    RGBMap map = mtx.previewMap(0, &handler);
     QCOMPARE(map.size(), 0); // No fixture group
 
     mtx.setFixtureGroup(0);
     steps = mtx.stepsCount();
     QCOMPARE(steps, 5);
 
-    map = mtx.previewMap(0);
+    map = mtx.previewMap(0, &handler);
     QCOMPARE(map.size(), 5);
 
     for (int z = 0; z < steps; z++)
     {
-        map = mtx.previewMap(z);
+        map = mtx.previewMap(z, &handler);
         for (int y = 0; y < 5; y++)
         {
             for (int x = 0; x < 5; x++)

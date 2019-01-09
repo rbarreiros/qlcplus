@@ -15,7 +15,7 @@ win32:QMAKE_LFLAGS += -shared
 
 # This must be after "TARGET = " and before target installation so that
 # install_name_tool can be run before target installation
-macx:include(../../macx/nametool.pri)
+macx:include(../../platforms/macos/nametool.pri)
 
 target.path = $$INSTALLROOT/$$PLUGINDIR
 INSTALLS   += target
@@ -46,7 +46,7 @@ SOURCES += oscpacketizer.cpp \
            configureosc.cpp
 
 unix:!macx {
-   metainfo.path   = $$INSTALLROOT/share/appdata/
-   metainfo.files += qlcplus-osc.metainfo.xml
-   INSTALLS       += metainfo 
+   metainfo.path   = $$METAINFODIR
+   metainfo.files += org.qlcplus.QLCPlus.osc.metainfo.xml
+   INSTALLS       += metainfo
 }

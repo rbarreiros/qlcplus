@@ -18,39 +18,29 @@
 */
 
 import QtQuick 2.0
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
 import "."
 
 Rectangle
 {
     id: funcDelegate
     width: 100
-    height: 35
+    height: UISettings.listItemHeight
 
     color: "transparent"
 
     property int functionID: -1
-    property Function func
+    property QLCFunction func
     property string textLabel
     property bool isSelected: false
     property int indexInList: -1
     property int highlightIndex: -1
-
-    signal clicked(int ID, var qItem, int mouseMods)
 
     onFunctionIDChanged:
     {
         func = functionManager.getFunction(functionID)
         textLabel = func.name
         funcEntry.functionType = func.type
-    }
-
-    onHighlightIndexChanged:
-    {
-        if (indexInList >= 0 && highlightIndex == indexInList)
-            topDragLine.visible = true
-        else
-            topDragLine.visible = false
     }
 
     Rectangle
@@ -81,22 +71,11 @@ Rectangle
     // top line drag highlight
     Rectangle
     {
-        id: topDragLine
-        visible: false
+        visible: highlightIndex == indexInList
         width: parent.width
         height: 2
         z: 1
         color: UISettings.selection
-    }
-
-    MouseArea
-    {
-        anchors.fill: parent
-        onClicked:
-        {
-            isSelected = true
-            funcDelegate.clicked(functionID, funcDelegate, mouse.modifiers)
-        }
     }
 }
 

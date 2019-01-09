@@ -103,7 +103,7 @@ void ShowEditor::updateFunctionList()
 
     if (m_show == NULL)
     {
-        qDebug() << Q_FUNC_INFO << "Invalid show !";
+        qDebug() << Q_FUNC_INFO << "Invalid show!";
         return;
     }
 
@@ -146,25 +146,23 @@ void ShowEditor::updateFunctionList()
             fItem->setText(NAME_COL, func->name());
             fItem->setData(NAME_COL, PROP_ID, func->id());
             fItem->setText(TIME_COL, Function::speedToString(sf->startTime()));
-            fItem->setText(DUR_COL, Function::speedToString(sf->duration()));
-            if (sf->startTime() + sf->duration() > totalDuration)
-                totalDuration = sf->startTime() + sf->duration();
+            fItem->setText(DUR_COL, Function::speedToString(sf->duration(m_doc)));
+            if (sf->startTime() + sf->duration(m_doc) > totalDuration)
+                totalDuration = sf->startTime() + sf->duration(m_doc);
 
-            if (func->type() == Function::Chaser)
+            if (func->type() == Function::ChaserType)
             {
                 Chaser *chaser = qobject_cast<Chaser*>(func);
                 fItem->setIcon(NAME_COL, QIcon(":/sequence.png"));
                 fItem->setText(STEPS_COL, QString("%1").arg(chaser->steps().count()));
             }
             else
-                fItem->setIcon(NAME_COL, Function::typeToIcon(func->type()));
+                fItem->setIcon(NAME_COL, func->getIcon());
         }
     }
 
     masterItem->setText(DUR_COL, Function::speedToString(totalDuration));
 
     m_tree->expandAll();
-    m_tree->resizeColumnToContents(NAME_COL);
-    m_tree->resizeColumnToContents(TIME_COL);
-    m_tree->resizeColumnToContents(DUR_COL);
+    m_tree->header()->resizeSections(QHeaderView::ResizeToContents);
 }

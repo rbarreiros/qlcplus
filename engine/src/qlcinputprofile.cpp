@@ -40,8 +40,12 @@
  ****************************************************************************/
 
 QLCInputProfile::QLCInputProfile()
+    : m_manufacturer(QString())
+    , m_model(QString())
+    , m_path(QString())
+    , m_type(Midi)
+    , m_midiSendNoteOff(true)
 {
-    m_midiSendNoteOff = true;
 }
 
 QLCInputProfile::QLCInputProfile(const QLCInputProfile& profile)
@@ -74,7 +78,7 @@ QLCInputProfile& QLCInputProfile::operator=(const QLCInputProfile& profile)
         while (it.hasNext() == true)
         {
             it.next();
-            insertChannel(it.key(), new QLCInputChannel(*it.value()));
+            insertChannel(it.key(), it.value()->createCopy());
         }
     }
 
@@ -161,8 +165,8 @@ QLCInputProfile::Type QLCInputProfile::stringToType(const QString& str)
 QList<QLCInputProfile::Type> QLCInputProfile::types()
 {
     QList<Type> result;
-    result 
-        << Midi 
+    result
+        << Midi
         << Osc
         << Hid
         << Dmx

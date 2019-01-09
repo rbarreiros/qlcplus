@@ -18,42 +18,37 @@
 */
 
 import QtQuick 2.2
-import QtQuick.Controls 1.2
+import QtQuick.Controls 2.1
 
 import "."
 
-Rectangle
+Button
 {
-    id: menuEntry
-    width: btnIcon.width + textBox.width + 10
-    height: parent.height
-    gradient: (checked || mouseArea1.containsMouse) ? selGradient : bgGradient
+    id: control
+    //implicitWidth: contentItem.width + 10
+    implicitHeight: parent.height
 
-    property color checkedColor: UISettings.toolbarSelectionMain
+    hoverEnabled: true
+    checkable: true
+    padding: 0
+    topPadding: 0
+    bottomPadding: 0
 
-    property bool checkable: false
     property string imgSource: ""
     property string entryText: ""
-    property bool checked: false
+    property real mFontSize: UISettings.textSizeDefault * 0.70
+    property int iconSize: imgSource ? height - 4 - topPadding - bottomPadding : 0
+
     property Gradient bgGradient: defBgGradient
     property Gradient selGradient: defSelectionGradient
-    property ExclusiveGroup exclusiveGroup: null
+    property color checkedColor: UISettings.toolbarSelectionMain
 
-    onExclusiveGroupChanged:
-    {
-        if (exclusiveGroup)
-            exclusiveGroup.bindCheckable(menuEntry)
-    }
-
-    signal clicked
     signal rightClicked
-    signal toggled
 
     Gradient
     {
         id: defBgGradient
         GradientStop { position: 0 ; color: "transparent" }
-        //GradientStop { position: 1 ; color: "#111" }
     }
     Gradient
     {
@@ -62,78 +57,62 @@ Rectangle
         GradientStop { position: 1 ; color: "#171717" }
     }
 
-    Rectangle
-    {
-        anchors.fill: parent
-        color: "#33ffffff"
-        visible: mouseArea1.pressed
-    }
-
-    Row
-    {
-        spacing: 2
-        anchors.fill: parent
-        anchors.leftMargin: 3
-
-        Image
+    contentItem:
+        Row
         {
-            id: btnIcon
-            height: imgSource == "" ? 0 : parent.height - 4
-            width: height
-            x: 2
-            y: 2
-            source: imgSource
-            sourceSize: Qt.size(width, height)
-        }
+            id: entryContents
+            width: btnIcon.width + btnLabel.width
 
-        Rectangle
-        {
-            y: 0
-            width: textBox.width
-            height: parent.height
-            color: "transparent"
+            Image
+            {
+                id: btnIcon
+                height: control.iconSize
+                width: control.iconSize
+                x: 2
+                y: 2
+                source: control.imgSource
+                sourceSize: Qt.size(control.iconSize, control.iconSize)
+            }
 
             RobotoText
             {
-                id: textBox
-                label: entryText
-                height: parent.height
-                fontSize: 12
+                id: btnLabel
+                height: control.height
+                label: control.entryText
+                fontSize: control.mFontSize
                 fontBold: true
-            }
-            Rectangle
-            {
-                id: selRect
-                radius: 2
-                color: checked ? checkedColor : "transparent"
-                height: 5
-                width: textBox.width
-                y: parent.height - height - 1
+
+                Rectangle
+                {
+                    id: selRect
+                    y: parent.height - height - 2
+                    height: UISettings.listItemHeight * 0.1
+                    width: parent.width
+                    radius: height / 2
+                    color: checked ? checkedColor : "transparent"
+
+                }
             }
         }
-    }
+
+    background:
+        Rectangle
+        {
+            gradient: (checked || hovered) ? selGradient : bgGradient
+            opacity: enabled ? 1 : 0.3
+        }
+
 
     MouseArea
     {
-        id: mouseArea1
         anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.RightButton
+
         onClicked:
         {
-            if (mouse.button == Qt.LeftButton)
-            {
-                if (checkable == true)
-                {
-                    if (checked == false)
-                        checked = true
-                    menuEntry.toggled(checked)
-                }
-                else
-                    menuEntry.clicked()
-            }
-            else
-                menuEntry.rightClicked()
+            if (mouse.button === Qt.RightButton)
+                control.rightClicked()
         }
     }
 }
+

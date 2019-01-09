@@ -18,46 +18,83 @@
 */
 
 import QtQuick 2.0
+import QtQuick.Layouts 1.1
 
-import com.qlcplus.classes 1.0
-import "PluginUtils.js" as PluginUtils
+import org.qlcplus.classes 1.0
+import "GenericHelpers.js" as Helpers
+import "."
 
 Rectangle
 {
+    id: ipRoot
     width: parent.width
-    height: profileBox.visible ? 110 : 80
+    height: UISettings.bigItemHeight * 0.9
     color: "transparent"
 
     property int universeID
     property InputPatch patch
 
+    signal removeProfile()
+
+    Rectangle
+    {
+        id: profileBox
+        width: parent.width
+        height: UISettings.bigItemHeight * 0.85
+        visible: patch ? (patch.profileName === "None" ? false : true) : false
+
+        border.width: 2
+        border.color: "#222"
+        color: "#269ABA"
+        radius: 10
+
+        IconButton
+        {
+            y: 4
+            x: parent.width - width - 10
+            height: UISettings.bigItemHeight * 0.25
+            width: height
+            faSource: FontAwesome.fa_times
+            faColor: "white"
+            tooltip: qsTr("Remove this input profile")
+            onClicked: ipRoot.removeProfile()
+        }
+
+        RobotoText
+        {
+            x: 10
+            y: 3
+            height: UISettings.bigItemHeight * 0.3
+            width: parent.width - 20
+            label: patch ? patch.profileName : ""
+            labelColor: "black"
+            fontSize: UISettings.textSizeDefault
+        }
+    }
+
     Rectangle
     {
         id: patchBox
         width: profileBox.visible ? parent.width - 10 : parent.width
-        height: 80
-        y: profileBox.visible ? 25 : 0
+        height: profileBox.visible ? UISettings.bigItemHeight * 0.5 : UISettings.bigItemHeight * 0.8
+        y: profileBox.visible ? UISettings.bigItemHeight * 0.3 : 0
         x: profileBox.visible ? 5 : 0
         z: 1
         radius: 3
-        gradient: Gradient
-        {
-            id: bgGradient
-            GradientStop { position: 0.75 ; color: "#999" }
-            GradientStop { position: 1 ; color: "#333" }
-        }
+        color: UISettings.bgLighter
         border.width: 2
         border.color: "#111"
 
+        /* LED kind-of signal indicator */
         Rectangle
         {
             id: valueChangeBox
-            x: parent.width - 30
+            x: parent.width - width - 10
             y: 10
             z: 1
-            width: 20
-            height: 20
-            radius: 10
+            width: UISettings.iconSizeMedium * 0.75
+            height: width
+            radius: height / 2
             border.width: 2
             border.color: "#333"
             color: "#666"
@@ -79,51 +116,30 @@ Rectangle
             }
         }
 
-        Row
+        RowLayout
         {
             x: 8
+            width: parent.width - 16
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 3
+
             Image
             {
-                id: pluginIcon
-                y: 2
-                height: patchBox.height - 6
+                height: ipRoot.height * 0.75
                 width: height
-                source: patch ? PluginUtils.iconFromName(patch.pluginName) : ""
+                source: patch ? Helpers.pluginIconFromName(patch.pluginName) : ""
                 sourceSize: Qt.size(width, height)
                 fillMode: Image.Stretch
             }
             RobotoText
             {
-                height: patchBox.height
-                width: patchBox.width - pluginIcon.width - 6
+                height: ipRoot.height
+                Layout.fillWidth: true
                 label: patch ? patch.inputName : ""
                 labelColor: "black"
                 wrapText: true
+                fontSize: UISettings.textSizeDefault
             }
-        }
-    }
-    Rectangle
-    {
-        id: profileBox
-        width: parent.width
-        height: patchBox.height + 30
-        visible: patch ? (patch.profileName === "None" ? false : true) : false
-
-        border.width: 2
-        border.color: "#222"
-        color: "#269ABA"
-        radius: 10
-
-        RobotoText
-        {
-            x: 10
-            y: 3
-            height: 20
-            width: parent.width - 20
-            label: patch ? patch.profileName : ""
-            labelColor: "black"
-            //wrapText: true
         }
     }
 }

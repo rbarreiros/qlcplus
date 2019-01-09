@@ -21,6 +21,7 @@
 #include <QXmlStreamWriter>
 #include <QDebug>
 
+#include "sequence.h"
 #include "track.h"
 #include "scene.h"
 #include "doc.h"
@@ -272,20 +273,21 @@ bool Track::postLoad(Doc* doc)
             continue;
         }
 
-        if (showFunction->duration() == 0)
-            showFunction->setDuration(function->totalDuration());
+        //if (showFunction->duration() == 0)
+        //    showFunction->setDuration(function->totalDuration());
         if (showFunction->color().isValid() == false)
             showFunction->setColor(ShowFunction::defaultColor(function->type()));
 
-        if (function->type() == Function::Chaser)
+        if (function->type() == Function::SequenceType)
         {
-            Chaser* chaser = qobject_cast<Chaser*>(function);
-            if (chaser == NULL || !chaser->isSequence() || getSceneID() == chaser->getBoundSceneID())
+            Sequence* sequence = qobject_cast<Sequence*>(function);
+            if (sequence == NULL || getSceneID() == sequence->boundSceneID())
                 continue;
+#ifndef QMLUI
             if (getSceneID() == Function::invalidId())
             {
                 // No scene ID, use the one from this sequence
-                setSceneID(chaser->getBoundSceneID());
+                setSceneID(sequence->boundSceneID());
             }
             else
             {
@@ -293,6 +295,7 @@ bool Track::postLoad(Doc* doc)
                 it.remove();
                 delete showFunction;
             }
+#endif
             modified = true;
         }
     }
@@ -321,4 +324,18 @@ bool Track::contains(Doc* doc, quint32 functionId)
     }
 
     return false;
+}
+
+QList<quint32> Track::components()
+{
+    QList<quint32> ids;
+
+    QListIterator<ShowFunction*> it(m_functions);
+    while (it.hasNext())
+    {
+        ShowFunction* showFunction = it.next();
+        ids.append(showFunction->functionID());
+    }
+
+    return ids;
 }

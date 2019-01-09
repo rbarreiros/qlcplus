@@ -32,10 +32,14 @@ Rectangle
     property int visibleWidth
     property real visibleX
     property int duration: -1
-    property int headerHeight: 40
+    property int headerHeight: UISettings.iconSizeMedium
     property int cursorHeight: 0
-    property real timeScale: 1.0
+    property real timeScale: showManager.timeScale
+    property real tickSize: showManager.tickSize
     property int currentTime: showManager.currentTime
+    property bool showTimeMarkers: true
+
+    signal clicked(int mouseX, int mouseY)
 
     onVisibleWidthChanged:
     {
@@ -53,7 +57,7 @@ Rectangle
           * is the visible one, the 1st chunk is for scrolling left and the 3rd chunk
           * for scrolling right.
           * Here, it is necessary to monitor the Flickable scroll position to properly
-          * shift and render the Canvas, so 2 actions have to be taken.
+          * shift and render the Canvas.
           */
 
         if (visibleX < timeHeader.x + visibleWidth || visibleX > timeHeader.x + (visibleWidth * 2))
@@ -67,19 +71,21 @@ Rectangle
 
     onCurrentTimeChanged:
     {
-        cursor.x = TimeUtils.timeToSize(currentTime, timeScale)
+        if (cursorHeight)
+            cursor.x = TimeUtils.timeToSize(currentTime, timeScale, tickSize)
     }
 
     onDurationChanged:
     {
-        width = parseInt(TimeUtils.timeToSize(duration + 300000, timeScale))
+        width = parseInt(TimeUtils.timeToSize(duration + 300000, timeScale, tickSize))
         //console.log("New header width: " + width)
     }
 
     onTimeScaleChanged:
     {
-        cursor.x = TimeUtils.timeToSize(currentTime, timeScale)
-        width = parseInt(TimeUtils.timeToSize(duration + 300000, timeScale))
+        if (cursorHeight)
+            cursor.x = TimeUtils.timeToSize(currentTime, timeScale, tickSize)
+        width = parseInt(TimeUtils.timeToSize(duration + 300000, timeScale, tickSize))
         timeHeader.requestPaint()
         //console.log("New header width: " + width)
     }
@@ -91,7 +97,7 @@ Rectangle
         width: 1
         color: "transparent"
         z: 1
-        visible: x >= visibleX ? true : false
+        visible: cursorHeight ? (x >= visibleX ? true : false) : false
 
         Rectangle
         {
@@ -114,65 +120,66 @@ Rectangle
     Canvas
     {
         id: timeHeader
+        x: -visibleWidth
         width: visibleWidth * 3
         height: headerHeight
         antialiasing: true
-
-        // tick size is the main time divider
-        // on a timeScale equal to 1.0 it is 100 pixels
-        property real tickSize: 100
-
-        Component.onCompleted: x = -visibleWidth
-
-        function calculateTickSize()
-        {
-
-        }
+        contextType: "2d"
 
         onPaint:
         {
-            var ctx = timeHeader.getContext('2d')
-            ctx.globalAlpha = 1.0
-            ctx.lineWidth = 1
+            var fontSize = headerHeight * 0.55
+            context.globalAlpha = 1.0
+            context.lineWidth = 1
 
-            ctx.fillStyle = "black"
-            ctx.strokeStyle = "white"
-            ctx.font = '14px "Roboto Condensed"'
-            ctx.fillRect(0, 0, width, headerHeight)
+            if (showTimeMarkers)
+            {
+                context.strokeStyle = "white"
+                context.fillStyle = "black"
+                context.font = fontSize + "px \"" + UISettings.robotoFontName + "\""
+                context.fillRect(0, 0, width, headerHeight)
+            }
+            else
+            {
+                context.strokeStyle = UISettings.bgLight
+                context.clearRect(0, 0, width, headerHeight)
+            }
 
             var divNum = width / tickSize
             var xPos = parseInt((x + width) / tickSize) * tickSize
-            var msTime = TimeUtils.posToMs(xPos, timeScale)
+            var msTime = TimeUtils.posToMs(xPos, timeScale, tickSize)
             xPos -= x
 
             //console.log("xPos: " + xPos + ", msTime: " + msTime)
 
-            ctx.beginPath();
-            ctx.fillStyle = "white"
+            context.beginPath()
+            context.fillStyle = "white"
 
             for (var i = 0; i < divNum; i++)
             {
                 // don't even bother to paint if we're outside the timeline
                 if (msTime >= 0)
                 {
-                    ctx.moveTo(xPos, 0)
-                    ctx.lineTo(xPos, height)
+                    context.moveTo(xPos, 0)
+                    context.lineTo(xPos, height)
 
-                    ctx.fillText(TimeUtils.msToString(msTime), xPos + 3, height - 20)
+                    if (showTimeMarkers)
+                        context.fillText(TimeUtils.msToString(msTime), xPos + 3, height - fontSize)
                 }
                 xPos -= tickSize
                 msTime -= timeScale * 1000
 
                 //console.log("xPos: " + xPos + ", msTime: " + msTime)
             }
-            ctx.closePath()
-            ctx.stroke()
+            context.closePath()
+            context.stroke()
         }
     }
 
     MouseArea
     {
+        enabled: showTimeMarkers
         anchors.fill: parent
-        onClicked: showManager.currentTime = TimeUtils.posToMs(mouse.x, timeScale)
+        onClicked: tlHeaderCursorLayer.clicked(mouse.x, mouse.y)
     }
 }

@@ -24,7 +24,6 @@
 #include <QHash>
 
 #include "showfunction.h"
-#include "chaser.h"
 #include "scene.h"
 
 class QXmlStreamReader;
@@ -154,10 +153,12 @@ public:
 
     bool loadXML(QXmlStreamReader &root);
 
-    bool postLoad(Doc* doc);
+    bool postLoad(Doc *doc);
 
 public:
-    bool contains(Doc* doc, quint32 functionId);
+    bool contains(Doc *doc, quint32 functionId);
+
+    QList<quint32> components();
 
 };
 

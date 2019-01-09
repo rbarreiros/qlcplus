@@ -47,8 +47,8 @@ unix:!macx {
     udev.files = linux/z65-fx5-hid.rules
     INSTALLS  += udev
 
-    metainfo.path   = $$INSTALLROOT/share/appdata/
-    metainfo.files += linux/qlcplus-hid.metainfo.xml
+    metainfo.path   = $$METAINFODIR
+    metainfo.files += linux/org.qlcplus.QLCPlus.hid.metainfo.xml
     INSTALLS       += metainfo
 }
 
@@ -65,7 +65,7 @@ TRANSLATIONS += HID_ja_JP.ts
 
 # This must be after "TARGET = " and before target installation so that
 # install_name_tool can be run before target installation
-macx:include(../../macx/nametool.pri)
+macx:include(../../platforms/macos/nametool.pri)
 
 target.path = $$INSTALLROOT/$$PLUGINDIR
 INSTALLS   += target

@@ -1,8 +1,9 @@
 /*
-  Q Light Controller
+  Q Light Controller Plus
   mastertimer.cpp
 
   Copyright (C) Heikki Junnila
+                Massimo Callegari
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 
 #include <QDebug>
 #include <QSettings>
+#include <QElapsedTimer>
 #include <QMutexLocker>
 
 #if defined(WIN32) || defined(Q_OS_WIN)
@@ -39,6 +41,7 @@
 #include "doc.h"
 
 #define MASTERTIMER_FREQUENCY "mastertimer/frequency"
+#define LATE_TO_BEAT_THRESHOLD 25
 
 /** The timer tick frequency in Hertz */
 uint MasterTimer::s_frequency = 50;
@@ -56,11 +59,15 @@ quint64 ticksCount = 0;
 
 MasterTimer::MasterTimer(Doc* doc)
     : QObject(doc)
+    , d_ptr(new MasterTimerPrivate(this))
     , m_stopAllFunctions(false)
     , m_dmxSourceListMutex(QMutex::Recursive)
-    , m_simpleDeskRegistered(false)
-    , m_fader(new GenericFader(doc))
-    , d_ptr(new MasterTimerPrivate(this))
+    , m_beatSourceType(None)
+    , m_currentBPM(120)
+    , m_beatTimeDuration(500)
+    , m_beatRequested(false)
+    , m_beatTimer(new QElapsedTimer())
+    , m_lastBeatOffset(0)
 {
     Q_ASSERT(doc != NULL);
     Q_ASSERT(d_ptr != NULL);
@@ -80,6 +87,8 @@ MasterTimer::~MasterTimer()
 
     delete d_ptr;
     d_ptr = NULL;
+
+    delete m_beatTimer;
 }
 
 void MasterTimer::start()
@@ -97,28 +106,55 @@ void MasterTimer::stop()
 
 void MasterTimer::timerTick()
 {
-    Doc* doc = qobject_cast<Doc*> (parent());
+    Doc *doc = qobject_cast<Doc*> (parent());
     Q_ASSERT(doc != NULL);
 
 #ifdef DEBUG_MASTERTIMER
     qDebug() << "[MasterTimer] *********** tick:" << ticksCount++ << "**********";
 #endif
 
-    doc->inputOutputMap()->flushInputs();
+    switch (m_beatSourceType)
+    {
+        case Internal:
+        {
+            int elapsedTime = qRound((double)m_beatTimer->nsecsElapsed() / 1000000) + m_lastBeatOffset;
+            //qDebug() << "Elapsed beat:" << elapsedTime;
+            if (elapsedTime >= m_beatTimeDuration)
+            {
+                // it's time to fire a beat
+                m_beatRequested = true;
+
+                // restart the time for the next beat, starting at a delta
+                // milliseconds, otherwise it will generate an unpleasant drift
+                //qDebug() << "Elapsed:" << elapsedTime << ", delta:" << elapsedTime - m_beatTimeDuration;
+                m_lastBeatOffset = elapsedTime - m_beatTimeDuration;
+                m_beatTimer->restart();
+
+                // inform the listening classes that a beat is happening
+                emit beat();
+            }
+        }
+        break;
+        case External:
+        break;
+
+        case None:
+        default:
+            m_beatRequested = false;
+        break;
+    }
 
     QList<Universe *> universes = doc->inputOutputMap()->claimUniverses();
-    for (int i = 0 ; i < universes.count(); i++)
-    {
-        universes[i]->zeroIntensityChannels();
-        universes[i]->zeroRelativeValues();
-    }
 
     timerTickFunctions(universes);
     timerTickDMXSources(universes);
-    timerTickFader(universes);
 
     doc->inputOutputMap()->releaseUniverses();
-    doc->inputOutputMap()->dumpUniverses();
+
+    m_beatRequested = false;
+
+    //qDebug() << ">>>>>>>> MASTERTIMER TICK";
+    emit tickReady();
 }
 
 uint MasterTimer::frequency()
@@ -157,14 +193,6 @@ void MasterTimer::stopAllFunctions()
 #else
         usleep(10000);
 #endif
-    }
-
-    // WARNING: the following brackets are fundamental for
-    // the scope of this piece of code !!
-    {
-        /* Remove all generic fader's channels */
-        QMutexLocker faderLocker(&m_faderMutex);
-        fader()->removeAll();
     }
 
     m_stopAllFunctions = false;
@@ -207,12 +235,6 @@ void MasterTimer::fadeAndStopAll(int timeout)
 
     // Stop all functions first
     stopAllFunctions();
-
-    // Instruct mastertimer to do a fade out of all
-    // the intensity channels that can fade
-    QMutexLocker faderLocker(&m_faderMutex);
-    foreach(FadeChannel fade, fcList)
-        fader()->add(fade);
 }
 
 int MasterTimer::runningFunctions() const
@@ -277,32 +299,33 @@ void MasterTimer::timerTickFunctions(QList<Universe *> universes)
         firstIteration = false;
     }
 
-    m_functionListMutex.lock();
-    while (m_startQueue.size() > 0)
     {
-        QList<Function*> startQueue(m_startQueue);
-        m_startQueue.clear();
-        m_functionListMutex.unlock();
-
-        foreach (Function* f, startQueue)
+        QMutexLocker locker(&m_functionListMutex);
+        while (m_startQueue.size() > 0)
         {
-            if (m_functionList.contains(f))
-            {
-                f->postRun(this, universes);
-            }
-            else
-            {
-                m_functionList.append(f);
-                functionListHasChanged = true;
-            }
-            f->preRun(this);
-            f->write(this, universes);
-            emit functionStarted(f->id());
-        }
+            QList<Function*> startQueue(m_startQueue);
+            m_startQueue.clear();
+            locker.unlock();
 
-        m_functionListMutex.lock();
+            foreach (Function* f, startQueue)
+            {
+                if (m_functionList.contains(f))
+                {
+                    f->postRun(this, universes);
+                }
+                else
+                {
+                    m_functionList.append(f);
+                    functionListHasChanged = true;
+                }
+                f->preRun(this);
+                f->write(this, universes);
+                emit functionStarted(f->id());
+            }
+
+            locker.relock();
+        }
     }
-    m_functionListMutex.unlock();
 
     if (functionListHasChanged)
         emit functionListChanged();
@@ -312,29 +335,16 @@ void MasterTimer::timerTickFunctions(QList<Universe *> universes)
  * DMX Sources
  ****************************************************************************/
 
-void MasterTimer::registerDMXSource(DMXSource* source, QString name)
+void MasterTimer::registerDMXSource(DMXSource *source)
 {
     Q_ASSERT(source != NULL);
 
     QMutexLocker lock(&m_dmxSourceListMutex);
     if (m_dmxSourceList.contains(source) == false)
-    {
-        if (name == "SimpleDesk")
-        {
-            m_dmxSourceList.append(source);
-            m_simpleDeskRegistered = true;
-        }
-        else
-        {
-            if (m_simpleDeskRegistered == true)
-                m_dmxSourceList.insert(m_dmxSourceList.count() - 1, source);
-            else
-                m_dmxSourceList.append(source);
-        }
-    }
+        m_dmxSourceList.append(source);
 }
 
-void MasterTimer::unregisterDMXSource(DMXSource* source)
+void MasterTimer::unregisterDMXSource(DMXSource *source)
 {
     Q_ASSERT(source != NULL);
 
@@ -347,7 +357,7 @@ void MasterTimer::timerTickDMXSources(QList<Universe *> universes)
     /* Lock before accessing the DMX sources list. */
     QMutexLocker lock(&m_dmxSourceListMutex);
 
-    foreach (DMXSource* source, m_dmxSourceList)
+    foreach (DMXSource *source, m_dmxSourceList)
     {
         Q_ASSERT(source != NULL);
 
@@ -360,53 +370,81 @@ void MasterTimer::timerTickDMXSources(QList<Universe *> universes)
     }
 }
 
-/****************************************************************************
- * Generic Fader
- ****************************************************************************/
+/*************************************************************************
+ * Beats generation
+ *************************************************************************/
 
-GenericFader* MasterTimer::fader() const
+void MasterTimer::setBeatSourceType(MasterTimer::BeatsSourceType type)
 {
-    return m_fader;
+    if (type == m_beatSourceType)
+        return;
+
+    // alright, this causes a time drift of maximum 1ms per beat
+    // but at the moment I am not looking for a better solution
+    m_beatTimeDuration = 60000 / m_currentBPM;
+    m_beatTimer->restart();
+
+    m_beatSourceType = type;
 }
 
-void MasterTimer::faderAdd(const FadeChannel& ch)
+MasterTimer::BeatsSourceType MasterTimer::beatSourceType() const
 {
-    QMutexLocker faderLocker(&m_faderMutex);
-
-    fader()->add(ch);
+    return m_beatSourceType;
 }
 
-void MasterTimer::faderForceAdd(const FadeChannel& ch)
+void MasterTimer::requestBpmNumber(int bpm)
 {
-    QMutexLocker faderLocker(&m_faderMutex);
+    if (bpm == m_currentBPM)
+        return;
 
-    fader()->forceAdd(ch);
+    m_currentBPM = bpm;
+    m_beatTimeDuration = 60000 / m_currentBPM;
+    m_beatTimer->restart();
+
+    emit bpmNumberChanged(bpm);
 }
 
-QHash<FadeChannel,FadeChannel> MasterTimer::faderChannels() const
+int MasterTimer::bpmNumber() const
 {
-    QMutexLocker faderLocker(const_cast<QMutex*>(&m_faderMutex));
-
-    return fader()->channels();
+    return m_currentBPM;
 }
 
-QHash<FadeChannel,FadeChannel> const& MasterTimer::faderChannelsRef() const
+int MasterTimer::beatTimeDuration() const
 {
-    return fader()->channels();
+    return m_beatTimeDuration;
 }
 
-QMutex* MasterTimer::faderMutex() const
+int MasterTimer::timeToNextBeat() const
 {
-    return const_cast<QMutex*>(&m_faderMutex);
+    return m_beatTimeDuration - m_beatTimer->elapsed();
 }
 
-void MasterTimer::timerTickFader(QList<Universe *> universes)
+int MasterTimer::nextBeatTimeOffset() const
 {
-    QMutexLocker faderLocker(&m_faderMutex);
+    // get the time offset to the next beat
+    int toNext = timeToNextBeat();
+    // get the percentage of beat time passed
+    int beatPercentage = (100 * toNext) / m_beatTimeDuration;
 
-#ifdef DEBUG_MASTERTIMER
-        qDebug() << "[MasterTimer] ticking fader (channels:" << fader()->channels().count() << ")";
-#endif
+    // if a Function has been started within the first LATE_TO_BEAT_THRESHOLD %
+    // of a beat, then it means it is "late" but there's
+    // no need to wait a whole beat
+    if (beatPercentage <= LATE_TO_BEAT_THRESHOLD)
+        return toNext;
 
-    fader()->write(universes);
+    // otherwise we're running early, so we should wait the
+    // whole remaining time
+    return -toNext;
+}
+
+bool MasterTimer::isBeat() const
+{
+    return m_beatRequested;
+}
+
+void MasterTimer::requestBeat()
+{
+    // forceful request of a beat, processed at
+    // the next timerTick call
+    m_beatRequested = true;
 }

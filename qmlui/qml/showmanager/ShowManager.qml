@@ -19,6 +19,9 @@
 
 import QtQuick 2.0
 import QtQuick.Layouts 1.1
+import QtQuick.Controls 2.1
+
+import org.qlcplus.classes 1.0
 
 import "TimeUtils.js" as TimeUtils
 import "."
@@ -31,26 +34,38 @@ Rectangle
 
     property string contextName: "SHOWMGR"
 
-    property int trackHeight: 80
-    property int trackWidth: 200
+    property int trackHeight: UISettings.mediumItemHeight
+    property int trackWidth: UISettings.bigItemHeight * 1.6
 
     property real timeScale: showManager.timeScale
-    property int headerHeight: 40
+    property real tickSize: showManager.tickSize
+    property int headerHeight: UISettings.iconSizeMedium
+    property real xViewOffset: 0
 
     property int showID: showManager.currentShowID
 
-    Component.onCompleted: showManager.renderView(itemsArea.contentItem)
+    onShowIDChanged: renderAndCenter()
+    Component.onCompleted: renderAndCenter()
 
-    onShowIDChanged:
+    function centerView()
     {
+        var xPos = TimeUtils.timeToSize(showManager.currentTime, timeScale, tickSize) - (timelineHeader.width / 2)
+        if (xPos >= 0)
+            xViewOffset = xPos
+    }
+
+    function renderAndCenter()
+    {
+        //console.log("Show Manager tick size: " + tickSize + "pixel")
         showManager.renderView(itemsArea.contentItem)
+        centerView()
     }
 
     Rectangle
     {
         id: topBar
         width: showMgrContainer.width
-        height: 44
+        height: UISettings.iconSizeDefault
         z: 5
         gradient: Gradient
         {
@@ -66,16 +81,12 @@ Rectangle
 
             spacing: 4
 
-            RobotoText
-            {
-                label: qsTr("Name")
-            }
+            RobotoText { label: qsTr("Name") }
 
             CustomTextEdit
             {
-                width: 200
+                width: showMgrContainer.width / 5
                 height: parent.height - 10
-                fontSize: 16
                 inputText: showManager.showName
 
                 onTextChanged: showManager.showName = text
@@ -89,14 +100,14 @@ Rectangle
                 height: width
                 imgSource: "qrc:/color.svg"
                 checkable: true
-                tooltip: qsTr("Show Items Color")
+                tooltip: qsTr("Show items color")
                 onCheckedChanged: colTool.visible = !colTool.visible
                 ColorTool
                 {
                     id: colTool
                     parent: mainView
                     x: colPickButton.x
-                    y: mainToolbar.height + colPickButton.y + colPickButton.height
+                    y: UISettings.bigItemHeight //colPickButton.y + colPickButton.height
                     z: 15
                     visible: false
 
@@ -106,14 +117,113 @@ Rectangle
 
             IconButton
             {
+                id: lockItem
+                z: 2
+                width: parent.height - 6
+                height: width
+                imgSource: "qrc:/lock.svg"
+                counter: showManager.selectedItemsCount
+
+                function checkLockStatus()
+                {
+                    if (showManager.selectedItemsLocked())
+                    {
+                        imgSource = "qrc:/unlock.svg"
+                        tooltip = qsTr("Unlock the selected items")
+                    }
+                    else
+                    {
+                        imgSource = "qrc:/lock.svg"
+                        tooltip = qsTr("Lock the selected items")
+                    }
+                }
+
+                onCounterChanged:
+                {
+                    checkLockStatus()
+                }
+
+                onClicked:
+                {
+                    var lock = showManager.selectedItemsLocked()
+                    if (lock === true)
+                        showManager.setSelectedItemsLock(false)
+                    else
+                        showManager.setSelectedItemsLock(true)
+                    checkLockStatus()
+                }
+            }
+
+            IconButton
+            {
+                id: gridButton
+                z: 2
+                width: parent.height - 6
+                height: width
+                imgSource: "qrc:/grid.svg"
+                tooltip: qsTr("Snap to grid")
+                checkable: true
+                checked: showManager.gridEnabled
+                onToggled: showManager.gridEnabled = checked
+            }
+
+            IconButton
+            {
                 id: stretchBtn
                 width: parent.height - 6
                 height: width
                 imgSource: "qrc:/stretch.svg"
-                tooltip: qsTr("Stretch the original Function")
+                tooltip: qsTr("Stretch the original function")
                 checkable: true
                 checked: showManager.stretchFunctions
                 onToggled: showManager.stretchFunctions = checked
+            }
+
+            IconButton
+            {
+                id: removeItem
+                z: 2
+                width: parent.height - 6
+                height: width
+                imgSource: "qrc:/remove.svg"
+                tooltip: qsTr("Remove the selected items")
+                counter: showManager.selectedItemsCount
+                onClicked:
+                {
+                    var selNames = showManager.selectedItemNames()
+                    //console.log(selNames)
+                    deleteItemsPopup.message = qsTr("Are you sure you want to remove the following items?\n(Note that the original functions will not be deleted)") + "\n" + selNames,
+                    deleteItemsPopup.open()
+                }
+
+                CustomPopupDialog
+                {
+                    id: deleteItemsPopup
+                    title: qsTr("Delete show items")
+                    onAccepted: showManager.deleteShowItems(showManager.selectedItemRefs())
+                }
+            }
+
+            IconButton
+            {
+                id: copyBtn
+                width: parent.height - 6
+                height: width
+                imgSource: "qrc:/edit-copy.svg"
+                tooltip: qsTr("Copy the selected items in the clipboard")
+                counter: showManager.selectedItemsCount
+                onClicked: showManager.copyToClipboard()
+            }
+
+            IconButton
+            {
+                id: pasteBtn
+                width: parent.height - 6
+                height: width
+                imgSource: "qrc:/edit-paste.svg"
+                tooltip: qsTr("Paste items in the clipboard at cursor position")
+                counter: showManager.selectedItemsCount
+                onClicked: showManager.pasteFromClipboard()
             }
 
             RobotoText
@@ -193,33 +303,64 @@ Rectangle
         height: showMgrContainer.headerHeight
         color: UISettings.bgStrong
 
-        Rectangle
+        RowLayout
         {
-            anchors.right: parent.right
-            width: verticalDivider.width
-            height: parent.height
-            color: UISettings.bgLight
-        }
-        ZoomItem
-        {
-            x: parent.width - width - 6
-            width: 100
-            height: parent.height - 2
-            fontColor: "#222"
-            onZoomOutClicked:
+            anchors.fill: parent
+
+            IconButton
             {
-                if (showManager.timeScale >= 1.0)
-                    showManager.timeScale += 1.0
-                else
-                    showManager.timeScale += 0.1
+                visible: showManager.selectedTrack > 0 ? true : false
+                height: parent.height - 2
+                width: height
+                imgSource: "qrc:/up.svg"
+                tooltip: qsTr("Move the selected track up")
             }
 
-            onZoomInClicked:
+            IconButton
             {
-                if (showManager.timeScale > 1.0)
-                    showManager.timeScale -= 1.0
-                else
-                    showManager.timeScale -= 0.1
+                visible: showManager.selectedTrack >= 0 ? true : false
+                height: parent.height - 2
+                width: height
+                imgSource: "qrc:/down.svg"
+                tooltip: qsTr("Move the selected track down")
+            }
+
+            // layout filler
+            Rectangle
+            {
+                Layout.fillWidth: true
+                color: "transparent"
+            }
+            ZoomItem
+            {
+                implicitWidth: UISettings.mediumItemHeight * 1.3
+                implicitHeight: parent.height - 2
+                fontColor: "#222"
+
+                onZoomOutClicked:
+                {
+                    if (showManager.timeScale >= 1.0)
+                        showManager.timeScale += 1.0
+                    else
+                        showManager.timeScale += 0.1
+                    centerView()
+                }
+
+                onZoomInClicked:
+                {
+                    if (showManager.timeScale > 1.0)
+                        showManager.timeScale -= 1.0
+                    else
+                        showManager.timeScale -= 0.1
+                    centerView()
+                }
+            }
+
+            Rectangle
+            {
+                width: verticalDivider.width
+                height: parent.height
+                color: UISettings.bgLight
             }
         }
     }
@@ -232,14 +373,16 @@ Rectangle
         x: trackWidth + verticalDivider.width
         y: topBar.height
         z: 4
-        height: showMgrContainer.headerHeight //showMgrContainer.height - topBar.height - (bottomPanel.visible ? bottomPanel.height : 0)
+        height: showMgrContainer.headerHeight
         width: showMgrContainer.width - trackWidth - rightPanel.width
 
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.HorizontalFlick
 
         contentWidth: hdrItem.width //> width ? hdrItem.width : width
-        contentX: itemsArea.contentX
+        contentX: xViewOffset
+
+        onContentXChanged: xViewOffset = contentX
 
         HeaderAndCursor
         {
@@ -247,11 +390,16 @@ Rectangle
             z: 2
             height: parent.height
             visibleWidth: timelineHeader.width
-            visibleX: itemsArea.contentX
+            visibleX: xViewOffset
             headerHeight: showMgrContainer.headerHeight
             cursorHeight: showMgrContainer.height - topBar.height - (bottomPanel.visible ? bottomPanel.height : 0)
-            timeScale: showMgrContainer.timeScale
             duration: showManager.showDuration
+
+            onClicked:
+            {
+                showManager.currentTime = TimeUtils.posToMs(mouseX, timeScale, tickSize)
+                showManager.resetItemsSelection()
+            }
         }
     }
 
@@ -264,33 +412,44 @@ Rectangle
         z: 3 // below timelineHeader
         width: parent.width - rightPanel.width
         height: showMgrContainer.height - topBar.height - headerHeight - (bottomPanel.visible ? bottomPanel.height : 0)
+        clip: true
 
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.VerticalFlick
+        ScrollBar.vertical: CustomScrollBar { }
 
-        contentHeight: tracksHeight > height ? tracksHeight : height
+        contentHeight: totalTracksHeight > height ? totalTracksHeight : height
         //contentWidth: timelineHeader.contentWidth
 
-        property int tracksHeight: (tracksBox.count + 1) * trackHeight
+        property real totalTracksHeight: (tracksBox.count + 1) * trackHeight
 
-        Column
+        Rectangle
         {
             width: trackWidth
+            height: parent.height
+            color: UISettings.bgMain
             z: 2
 
-            Repeater
+            Column
             {
-                id: tracksBox
-                width: parent.width
-                model: showManager.tracks
+                width: trackWidth
 
-                delegate:
-                    TrackDelegate
-                    {
-                        width: tracksBox.width
-                        height: trackHeight
-                        trackRef: modelData
-                    }
+                Repeater
+                {
+                    id: tracksBox
+                    width: parent.width
+                    model: showManager.tracks
+
+                    delegate:
+                        TrackDelegate
+                        {
+                            width: tracksBox.width
+                            height: trackHeight
+                            trackRef: modelData
+                            trackIndex: index
+                            isSelected: showManager.selectedTrack === index ? true : false
+                        }
+                }
             }
         }
 
@@ -319,14 +478,22 @@ Rectangle
             boundsBehavior: Flickable.StopAtBounds
             contentHeight: showContents.contentHeight
             contentWidth: timelineHeader.contentWidth
-            contentX: timelineHeader.contentX
+            contentX: xViewOffset
+            ScrollBar.horizontal: CustomScrollBar { orientation: Qt.Horizontal }
+
+            onContentXChanged: xViewOffset = contentX
 
             MouseArea
             {
                 anchors.fill: parent
-                onClicked: showManager.currentTime = TimeUtils.posToMs(mouse.x, timeScale)
+                onClicked:
+                {
+                    showManager.currentTime = TimeUtils.posToMs(mouse.x, timeScale, tickSize)
+                    showManager.resetItemsSelection()
+                }
             }
 
+            // track divider horizontal lines
             Repeater
             {
                 model: tracksBox.count
@@ -339,10 +506,24 @@ Rectangle
                         color: UISettings.bgLight
                     }
             }
+
+            HeaderAndCursor
+            {
+                id: gridItem
+                visible: showManager.gridEnabled
+                z: 2
+                height: parent.height
+                visibleWidth: itemsArea.width
+                visibleX: xViewOffset
+                headerHeight: parent.height
+                duration: showManager.showDuration
+                showTimeMarkers: false
+            }
+
             DropArea
             {
                 id: newFuncDrop
-                x: itemsArea.contentX
+                x: xViewOffset
                 width: showMgrContainer.width - trackWidth
                 height: tracksBox.count * trackHeight
                 z: 2
@@ -350,18 +531,36 @@ Rectangle
                 keys: [ "function" ]
                 onDropped:
                 {
-                    console.log("Function item dropped here. x: " + drag.x + " y: " + drag.y)
-                    var trackIdx = (itemsArea.contentY + drag.y) / trackHeight
-                    var fTime = TimeUtils.posToMs(itemsArea.contentX + drag.x, timeScale)
-                    console.log("Drop on time: " + fTime)
-                    showManager.addItem(itemsArea.contentItem, trackIdx, fTime, drag.source.funcID)
+                    console.log("Function items dropped here. x: " + drag.x + " y: " + drag.y)
+
+                    /* Check if the dragging was started from a Function Manager */
+                    if (drag.source.hasOwnProperty("fromFunctionManager"))
+                    {
+                        var trackIdx = (itemsArea.contentY + drag.y) / trackHeight
+                        var fTime = TimeUtils.posToMs(itemsArea.contentX + drag.x, timeScale, tickSize)
+                        console.log("Drop on time: " + fTime)
+                        showManager.addItems(itemsArea.contentItem, trackIdx, fTime, drag.source.itemsList)
+                    }
+/*
+                    if (drag.source.funcID !== showID)
+                    {
+                        showManager.addItem(itemsArea.contentItem, trackIdx, fTime, drag.source.funcID)
+                    }
+                    else
+                    {
+                        var args = []
+                        actionManager.requestActionPopup(ActionManager.None,
+                                                         qsTr("Cannot drag a Show into itself!"),
+                                                         ActionManager.OK, args)
+                    }
+*/
                 }
             }
 
             Rectangle
             {
                 id: newTrackBox
-                x: itemsArea.contentX
+                x: xViewOffset
                 y: tracksBox.count * trackHeight
                 height: trackHeight
                 width: itemsArea.width
@@ -403,16 +602,21 @@ Rectangle
                     onDropped:
                     {
                         console.log("Function item dropped here. x: " + drag.x + " y: " + drag.y)
-                        var fTime = TimeUtils.posToMs(itemsArea.contentX + drag.x, timeScale)
-                        console.log("Drop on time: " + fTime)
-                        showManager.addItem(itemsArea.contentItem, -1, fTime, drag.source.funcID)
+
+                        /* Check if the dragging was started from a Function Manager */
+                        if (drag.source.hasOwnProperty("fromFunctionManager"))
+                        {
+                            var fTime = TimeUtils.posToMs(xViewOffset + drag.x, timeScale, tickSize)
+                            console.log("Drop on time: " + fTime)
+                            showManager.addItems(itemsArea.contentItem, -1, fTime, drag.source.itemsList)
+                        }
                     }
                 }
             }
         }
     }
-
-    ScrollBar
+/*
+    CustomScrollBar
     {
         id: horScrollbar
         z: 4
@@ -421,6 +625,7 @@ Rectangle
         x: trackWidth
         flickable: timelineHeader
     }
-    ScrollBar { z: 5; flickable: showContents; doubleBars: true }
 
+    CustomScrollBar { z: 5; flickable: showContents; doubleBars: true }
+*/
 }

@@ -35,6 +35,7 @@ class Universe;
 class DMXSource
 {
 public:
+    DMXSource() { m_changed = false; }
     virtual ~DMXSource() {}
 
     /**
@@ -44,6 +45,13 @@ public:
      * @param universes Universe buffer to write to
      */
     virtual void writeDMX(MasterTimer* timer, QList<Universe*> universes) = 0;
+
+    /** Get/Set if the DMX source has changed */
+    bool hasChanged() { return m_changed; }
+    void setChanged(bool changed) { m_changed = changed; }
+
+protected:
+    bool m_changed;
 };
 
 /** @} */

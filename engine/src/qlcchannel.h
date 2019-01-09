@@ -39,9 +39,10 @@ class QXmlStreamWriter;
  */
 
 #define KXMLQLCChannel          QString("Channel")
-#define KXMLQLCChannelNumber    QString("Number")
 #define KXMLQLCChannelName      QString("Name")
+#define KXMLQLCChannelPreset    QString("Preset")
 #define KXMLQLCChannelGroup     QString("Group")
+#define KXMLQLCChannelDefault   QString("Default")
 #define KXMLQLCChannelGroupByte QString("Byte")
 #define KXMLQLCChannelColour    QString("Colour")
 
@@ -68,14 +69,15 @@ class QXmlStreamWriter;
  * fixture modes. Instead, a QLCFixtureMode defines the actual channel number
  * for each of its QLCChannels.
  */
-class QLCChannel
+class QLCChannel : public QObject
 {
+    Q_OBJECT
+
 public:
     /** Standard constructor */
-    QLCChannel();
+    QLCChannel(QObject *parent = 0);
 
-    /** Copy constructor */
-    QLCChannel(const QLCChannel* channel);
+    QLCChannel *createCopy();
 
     /** Destructor */
     ~QLCChannel();
@@ -87,6 +89,106 @@ public:
      * The invalid channel number (for comparison etc...)
      */
     static quint32 invalid();
+
+    /*********************************************************************
+     * Presets
+     *
+     * please see
+     * https://github.com/mcallegari/qlcplus/wiki/Fixture-definition-presets
+     * when changing this list
+     *********************************************************************/
+public:
+    enum Preset
+    {
+        Custom = 0,
+        IntensityMasterDimmer,
+        IntensityMasterDimmerFine,
+        IntensityDimmer,
+        IntensityDimmerFine,
+        IntensityRed,
+        IntensityRedFine,
+        IntensityGreen,
+        IntensityGreenFine,
+        IntensityBlue,
+        IntensityBlueFine,
+        IntensityCyan,
+        IntensityCyanFine,
+        IntensityMagenta,
+        IntensityMagentaFine,
+        IntensityYellow,
+        IntensityYellowFine,
+        IntensityAmber,
+        IntensityAmberFine,
+        IntensityWhite,
+        IntensityWhiteFine,
+        IntensityUV,
+        IntensityUVFine,
+        IntensityIndigo,
+        IntensityIndigoFine,
+        IntensityLime,
+        IntensityLimeFine,
+        IntensityHue,
+        IntensityHueFine,
+        IntensitySaturation,
+        IntensitySaturationFine,
+        IntensityLightness,
+        IntensityLightnessFine,
+        IntensityValue,
+        IntensityValueFine,
+        PositionPan,
+        PositionPanFine,
+        PositionTilt,
+        PositionTiltFine,
+        PositionXAxis,
+        PositionYAxis,
+        SpeedPanSlowFast,
+        SpeedPanFastSlow,
+        SpeedTiltSlowFast,
+        SpeedTiltFastSlow,
+        SpeedPanTiltSlowFast,
+        SpeedPanTiltFastSlow,
+        ColorMacro,
+        ColorWheel,
+        ColorWheelFine,
+        ColorRGBMixer,
+        ColorCTOMixer,
+        ColorCTCMixer,
+        ColorCTBMixer,
+        GoboWheel,
+        GoboWheelFine,
+        GoboIndex,
+        GoboIndexFine,
+        ShutterStrobeSlowFast,
+        ShutterStrobeFastSlow,
+        ShutterIrisMinToMax,
+        ShutterIrisMaxToMin,
+        ShutterIrisFine,
+        BeamFocusNearFar,
+        BeamFocusFarNear,
+        BeamFocusFine,
+        BeamZoomSmallBig,
+        BeamZoomBigSmall,
+        BeamZoomFine,
+        PrismRotationSlowFast,
+        PrismRotationFastSlow,
+        NoFunction,
+        LastPreset // dummy for cycles
+    };
+#if QT_VERSION >= 0x050500
+    Q_ENUM(Preset)
+#else
+    Q_ENUMS(Preset)
+#endif
+    static QString presetToString(Preset preset);
+    static Preset stringToPreset(const QString &preset);
+
+    Preset preset() const;
+    void setPreset(Preset preset);
+
+    QLCCapability *addPresetCapability();
+
+protected:
+    Preset m_preset;
 
     /*********************************************************************
      * Groups
@@ -105,6 +207,7 @@ public:
         Beam,
         Effect,
         Maintenance,
+        Nothing,
         NoGroup = INT_MAX
     };
 
@@ -127,7 +230,7 @@ public:
     QIcon getIcon() const;
 
     /** Get the channel's icon resource name */
-    QString getIconNameFromGroup(QLCChannel::Group grp) const;
+    QString getIconNameFromGroup(QLCChannel::Group grp, bool svg = false) const;
 
 private:
     QPixmap drawIntensity(QColor color, QString str) const;
@@ -136,7 +239,7 @@ private:
     QIcon getIntensityIcon() const;
 
     /** Get the intensity channel color name */
-    QString getIntensityColorCode() const;
+    QString getIntensityColorCode(bool svg = false) const;
 
 protected:
     Group m_group;
@@ -145,6 +248,7 @@ protected:
      * Properties
      *********************************************************************/
 public:
+    /** Role in a 16bit mode */
     enum ControlByte
     {
         MSB = 0,
@@ -157,6 +261,12 @@ public:
     /** Set the channel's name */
     void setName(const QString& name);
 
+    /** Get the channel's default value */
+    uchar defaultValue() const;
+
+    /** Set the channel's default value */
+    void setDefaultValue(uchar value);
+
     /** Set the channel's control byte */
     void setControlByte(ControlByte byte);
 
@@ -165,6 +275,7 @@ public:
 
 protected:
     QString m_name;
+    uchar m_defaultValue;
     ControlByte m_controlByte;
 
     /*************************************************************************
@@ -183,7 +294,8 @@ public:
         Amber       = 0xFF7E00,
         White       = 0xFFFFFF,
         UV          = 0x9400D3,
-        Lime        = 0xADFF2F
+        Lime        = 0xADFF2F,
+        Indigo      = 0x4B0082
     };
 
     /** Get a list of possible channel groups */

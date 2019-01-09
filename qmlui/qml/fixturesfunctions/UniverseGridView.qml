@@ -18,6 +18,7 @@
 */
 
 import QtQuick 2.0
+import "."
 
 Flickable
 {
@@ -28,6 +29,7 @@ Flickable
 
     contentHeight: uniGrid.height + uniText.height
 
+    property string contextName: "UNIGRID"
     property int uniStartAddr: viewUniverseCombo.currentIndex * 512
 
     function hasSettings()
@@ -38,10 +40,10 @@ Flickable
     RobotoText
     {
         id: uniText
-        height: 45
-        labelColor: "#ccc"
+        height: UISettings.textSizeDefault * 2
+        labelColor: UISettings.fgLight
         label: viewUniverseCombo.currentText
-        fontSize: 30
+        fontSize: UISettings.textSizeDefault * 1.5
         fontBold: true
     }
 
@@ -49,17 +51,47 @@ Flickable
     {
         id: uniGrid
         anchors.top: uniText.bottom
-        width: parent.width
+        width: parent.width - 40
+        height: cellSize * gridSize.height
 
         showIndices: 512
         gridSize: Qt.size(24, 22)
+        gridLabels: fixtureManager.fixtureNamesMap
         gridData: fixtureManager.fixturesMap
+
+        function getItemIcon(itemID, chNumber)
+        {
+            return fixtureManager.channelIcon(itemID, chNumber)
+        }
+
+        function getTooltip(xPos, yPos)
+        {
+            var uniAddress = (yPos * gridSize.width) + xPos
+            return fixtureManager.getTooltip(uniAddress)
+        }
 
         onPressed:
         {
+            universeGridView.interactive = false
             var uniAddress = (yPos * gridSize.width) + xPos
+            if (selectionData && selectionData.indexOf(uniAddress) >= 0)
+                return
+            if (contextManager.multipleSelection === false && mods == 0)
+            {
+                var empty = []
+                setSelectionData(empty)
+            }
             console.log("Fixture pressed at address: " + uniAddress)
             setSelectionData(fixtureManager.fixtureSelection(uniAddress))
+        }
+
+        onReleased:
+        {
+            universeGridView.interactive = true
+            if (currentItemID === -1 || validSelection == false)
+                return;
+            var uniAddress = (yPos * gridSize.width) + xPos
+            fixtureManager.moveFixture(currentItemID, selectionData[0] + offset)
         }
 
         onDragEntered:
@@ -72,8 +104,10 @@ Flickable
             {
                 for (var i = 0; i < channels; i++)
                     tmp.push(uniAddress + i)
+
                 uniAddress += channels + dragEvent.source.gap
             }
+            console.log("Selection data contains " + tmp.length + " entries")
             setSelectionData(tmp)
         }
 
@@ -81,9 +115,20 @@ Flickable
         {
             var uniAddress = (yPos * gridSize.width) + xPos
             dragEvent.source.address = uniAddress
-            var freeAddr = fixtureBrowser.availableChannel(0, dragEvent.source.channels, // FIXME: use the correct universe
+            var freeAddr = fixtureBrowser.availableChannel(contextManager.universeFilter, dragEvent.source.channels,
                                                            dragEvent.source.quantity,
                                                            dragEvent.source.gap, uniAddress)
+            if (freeAddr === uniAddress)
+                validSelection = true
+            else
+                validSelection = false
+        }
+
+        onPositionChanged:
+        {
+            var uniAddress = (yPos * gridSize.width) + xPos
+            var freeAddr = fixtureBrowser.availableChannel(currentItemID, uniAddress)
+
             if (freeAddr === uniAddress)
                 validSelection = true
             else

@@ -19,14 +19,15 @@
 
 import QtQuick 2.0
 
-import "PluginUtils.js" as PluginUtils
+import "GenericHelpers.js" as Helpers
+import "."
 
 Rectangle
 {
     x: 3
     id: pluginDragItem
     width: parent.width
-    height: 60
+    height: UISettings.listItemHeight * 1.7
     color: "transparent"
 
     property int pluginUniverse
@@ -46,8 +47,8 @@ Rectangle
                 Gradient
                 {
                     id: bgGradient
-                    GradientStop { position: 0.75 ; color: "#FFF" }
-                    GradientStop { position: 1 ; color: "#7F7F7F" }
+                    GradientStop { position: 0.75 ; color: UISettings.fgMain }
+                    GradientStop { position: 1 ; color: UISettings.fgMedium }
                 }
             border.width: 2
             border.color: "#777"
@@ -59,7 +60,7 @@ Rectangle
                 id: pIcon
                 anchors.fill: parent
                 anchors.margins: 3
-                source: PluginUtils.iconFromName(pluginName)
+                source: Helpers.pluginIconFromName(pluginName)
                 sourceSize: Qt.size(width, height)
                 fillMode: Image.Stretch
             }

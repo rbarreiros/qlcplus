@@ -12,21 +12,27 @@ QTPLUGIN  =
 INCLUDEPATH += ../interfaces
 
 macx: {
-    #CONFIG    += link_pkgconfig
-    #PKGCONFIG += libola libolaserver
     #QMAKE_CXXFLAGS_X86_64 -= -mmacosx-version-min=10.5
     #QMAKE_CXXFLAGS_X86_64 = -mmacosx-version-min=10.7
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.9
-    INCLUDEPATH += /opt/local/include
-    LIBS      += -L/opt/local/lib -lolaserver -lola -lolacommon -lprotobuf
+
+    # Check for pkg-config and setup queries accordingly.
+    # Otherwise, use MacPorts default paths.
+    packagesExist(libola libolaserver){
+        CONFIG    += link_pkgconfig
+        PKGCONFIG += libola libolaserver
+    } else {
+        INCLUDEPATH += /opt/local/include
+        LIBS      += -L/opt/local/lib -lolaserver -lola -lolacommon
+    }
 } else {
-    LIBS      += -L/usr/local/lib -lolaserver -lola -lolacommon -lprotobuf
+    LIBS      += -L/usr/local/lib -lolaserver -lola -lolacommon
 }
 
 unix:!macx {
-   metainfo.path   = $$INSTALLROOT/share/appdata/
-   metainfo.files += qlcplus-ola.metainfo.xml
-   INSTALLS       += metainfo 
+   metainfo.path   = $$METAINFODIR
+   metainfo.files += org.qlcplus.QLCPlus.ola.metainfo.xml
+   INSTALLS       += metainfo
 }
 
 
@@ -61,7 +67,7 @@ TRANSLATIONS += OLA_ja_JP.ts
 # This must be after "TARGET = " and before target installation so that
 # install_name_tool can be run before target installation
 macx {
-    include(../../macx/nametool.pri)
+    include(../../platforms/macos/nametool.pri)
 }
 
 # Installation

@@ -39,7 +39,7 @@ class AudioPluginCache : public QObject
 public:
     AudioPluginCache(QObject* parent);
     ~AudioPluginCache();
-    
+
     /** Load plugins from the given directory. */
     void load(const QDir& dir);
 
@@ -55,7 +55,8 @@ public:
     QList<AudioDeviceInfo> audioDevicesList() const;
 
 private:
-    QStringList m_pluginsPathList;
+    /** a map of the vailable plugins ordered by priority */
+    QMap<int, QString> m_pluginsMap;
     QList<AudioDeviceInfo> m_audioDevicesList;
 };
 

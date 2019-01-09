@@ -19,6 +19,7 @@
 
 import QtQuick 2.2
 
+import org.qlcplus.classes 1.0
 import "."
 
 Column
@@ -27,24 +28,43 @@ Column
     width: 350
     //height: nodeLabel.height + nodeChildrenView.height
 
+    property var cRef
     property string textLabel
-    property string nodePath
-    property var folderChildren
+    property string itemIcon: "qrc:/folder.svg"
+    property int itemType: App.GenericDragItem
+
     property bool isExpanded: false
     property bool isSelected: false
-    property string nodeIcon: "qrc:/folder.svg"
+    property bool isCheckable: false
+    property bool isChecked: false
+
+    property string nodePath
+    property var nodeChildren
     property string childrenDelegate: "qrc:/FunctionDelegate.qml"
+    property string subTreeDelegate: "qrc:/TreeNodeDelegate.qml"
+    property Item dragItem
+    property string dropKeys: ""
 
     signal toggled(bool expanded, int newHeight)
-    signal clicked(int ID, var qItem, int mouseMods)
-    signal doubleClicked(int ID, int Type)
+    signal mouseEvent(int type, int iID, int iType, var qItem, int mouseMods)
     signal pathChanged(string oldPath, string newPath)
+    signal itemsDropped(string path)
+
+    function getItemAtPos(x, y)
+    {
+        var child = nodeChildrenView.itemAt(x, y)
+        if (child.item.hasOwnProperty("nodePath"))
+            return child.item.getItemAtPos(x, y - child.item.y)
+
+        return child.item
+    }
 
     Rectangle
     {
-        color: "transparent"
+        id: nodeBgRect
+        color: nodeIconImg.visible ? "transparent" : UISettings.sectionHeader
         width: nodeContainer.width
-        height: 35
+        height: UISettings.listItemHeight
 
         // selection rectangle
         Rectangle
@@ -52,63 +72,131 @@ Column
             anchors.fill: parent
             radius: 3
             color: UISettings.highlight
-            visible: isSelected
+            visible: isSelected || tnDropArea.containsDrag
         }
 
-        Image
+        Row
         {
-            width: 40
-            height: 35
-            source: nodeIcon
-        }
-
-        TextInput
-        {
-            id: nodeLabel
-            x: 45
-            z: 0
-            width: parent.width - 45
-            height: 35
-            readOnly: true
-            text: textLabel
-            verticalAlignment: TextInput.AlignVCenter
-            color: UISettings.fgMain
-            font.family: "RobotoCondensed"
-            font.pointSize: 12
-            echoMode: TextInput.Normal
-            selectByMouse: true
-            selectionColor: "#4DB8FF"
-            selectedTextColor: "#111"
-
-            onEditingFinished:
+            CustomCheckBox
             {
-                z = 0
-                select(0, 0)
-                readOnly = true
-                nodeContainer.pathChanged(nodePath, text)
+                id: nodeCheckBox
+                visible: isCheckable
+                implicitWidth: UISettings.listItemHeight
+                implicitHeight: implicitWidth
+                checked: isChecked
+                onCheckedChanged: nodeContainer.mouseEvent(App.Checked, -1, checked, nodeContainer, 0)
             }
-        }
+
+            Image
+            {
+                id: nodeIconImg
+                visible: itemIcon == "" ? false : true
+                width: nodeBgRect.height
+                height: width
+                source: itemIcon
+                sourceSize: Qt.size(width, height)
+            }
+
+            TextInput
+            {
+                property string originalText
+
+                id: nodeLabel
+                z: 0
+                width: nodeBgRect.width - x - 1
+                height: UISettings.listItemHeight
+                readOnly: true
+                text: cRef ? cRef.name : textLabel
+                verticalAlignment: TextInput.AlignVCenter
+                color: UISettings.fgMain
+                font.family: UISettings.robotoFontName
+                font.pixelSize: UISettings.textSizeDefault
+                echoMode: TextInput.Normal
+                selectByMouse: true
+                selectionColor: "#4DB8FF"
+                selectedTextColor: "#111"
+
+                function disableEditing()
+                {
+                    z = 0
+                    select(0, 0)
+                    readOnly = true
+                    cursorVisible = false
+                }
+
+                Keys.onPressed:
+                {
+                    switch(event.key)
+                    {
+                        case Qt.Key_F2:
+                            originalText = textLabel
+                            z = 5
+                            readOnly = false
+                            cursorPosition = text.length
+                            cursorVisible = true
+                        break;
+                        case Qt.Key_Escape:
+                            disableEditing()
+                            nodeLabel.text = originalText
+                        break;
+                        default:
+                            event.accepted = false
+                            return
+                    }
+
+                    event.accepted = true
+                }
+
+                onEditingFinished:
+                {
+                    if (readOnly)
+                        return
+                    disableEditing()
+                    nodeContainer.pathChanged(nodePath, text)
+                }
+            }
+        } // Row
 
         MouseArea
         {
-            anchors.fill: parent
-            height: 35
+            x: nodeCheckBox.visible ? nodeCheckBox.width : 0
+            width: parent.width
+            height: parent.height
+
+            property bool dragActive: drag.active
+
+            onDragActiveChanged:
+            {
+                console.log("Drag changed on node: " + textLabel)
+                nodeContainer.mouseEvent(dragActive ? App.DragStarted : App.DragFinished,
+                                         cRef ? cRef.id : -1, nodeContainer.itemType, nodeContainer, 0)
+            }
+
+            drag.target: dragItem
+
+            onPressed: nodeContainer.mouseEvent(App.Pressed, cRef ? cRef.id : -1, nodeContainer.itemType,
+                                                nodeContainer, mouse.modifiers)
             onClicked:
             {
-                isExpanded = !isExpanded
-                isSelected = true
-                nodeContainer.clicked(-1, nodeContainer, mouse.modifiers)
+                nodeLabel.forceActiveFocus()
+                nodeContainer.mouseEvent(App.Clicked, cRef ? cRef.id : -1, nodeContainer.itemType,
+                                         nodeContainer, mouse.modifiers)
             }
-            onDoubleClicked:
-            {
-                nodeLabel.z = 5
-                nodeLabel.readOnly = false
-                nodeLabel.focus = true
-                nodeLabel.cursorPosition = nodeLabel.text.length
-                nodeLabel.cursorVisible = true
-            }
+            onDoubleClicked: isExpanded = !isExpanded
         }
 
+        DropArea
+        {
+            id: tnDropArea
+            anchors.fill: parent
+            keys: [ nodeContainer.dropKeys ]
+
+            onDropped:
+            {
+                console.log("Item dropped here. x: " + drop.x + " y: " + drop.y + ", items: " + drop.source.itemsList.length)
+                nodeContainer.itemsDropped(nodePath)
+            }
+        }
     }
 
     Repeater
@@ -116,49 +204,100 @@ Column
         id: nodeChildrenView
         visible: isExpanded
         width: nodeContainer.width - 20
-        model: visible ? folderChildren : null
+        model: visible ? nodeChildren : null
         delegate:
             Component
             {
                 Loader
                 {
-                    id: childrenLoader
                     width: nodeChildrenView.width
                     x: 20
                     //height: 35
-                    source: hasChildren ? "qrc:/TreeNodeDelegate.qml" : childrenDelegate
+                    source: hasChildren ? subTreeDelegate : childrenDelegate
                     onLoaded:
                     {
-                        item.textLabel = label
+                        item.textLabel = Qt.binding(function() { return label })
+                        item.isSelected = Qt.binding(function() { return model.isSelected })
+                        item.isCheckable = model.isCheckable
+                        item.isChecked = Qt.binding(function() { return model.isChecked })
+                        item.dragItem = dragItem
+                        if (hasOwnProperty("type") && item.hasOwnProperty("itemType"))
+                            item.itemType = type
+
+                        if (item.hasOwnProperty('itemIcon'))
+                            item.itemIcon = nodeContainer.itemIcon
+
+                        if (model.classRef !== undefined && item.hasOwnProperty('cRef'))
+                            item.cRef = classRef
+
+                        if (item.hasOwnProperty('itemID'))
+                            item.itemID = id
+
+                        //console.log("Item flags: " + model.flags);
+                        if (model.flags !== undefined && item.hasOwnProperty("itemFlags"))
+                        {
+                            item.showFlags = true
+                            item.itemFlags = Qt.binding(function() { return model.flags })
+                        }
+
                         if (hasChildren)
                         {
-                            item.nodePath = nodePath + "/" + path
-                            item.folderChildren = childrenModel
-                            item.nodeIcon = nodeContainer.nodeIcon
-                            item.childrenDelegate = childrenDelegate
+                            item.nodePath = Qt.binding(function() { return nodePath + '`' + path })
+                            item.isExpanded = isExpanded
+                            item.nodeChildren = childrenModel
+                            if (item.hasOwnProperty('dropKeys'))
+                                item.dropKeys = nodeContainer.dropKeys
+                            if (item.hasOwnProperty('childrenDelegate'))
+                                item.childrenDelegate = childrenDelegate
 
-                            console.log("Item path: " + item.nodePath + ", label: " + label)
+                            //console.log("Item path: " + item.nodePath + ", label: " + label)
                         }
-                        else
+                    }
+                    Connections
+                    {
+                        target: item
+                        onMouseEvent:
                         {
-                            item.cRef = classRef
+                            console.log("Got generic tree node mouse event")
+                            switch (type)
+                            {
+                                case App.Clicked:
+                                    if (qItem == item)
+                                    {
+                                        model.isSelected = (mouseMods & Qt.ControlModifier) ? 2 : 1
+                                        if (model.hasChildren)
+                                            model.isExpanded = item.isExpanded
+                                    }
+                                break;
+                                case App.Checked:
+                                    if (qItem == item)
+                                        model.isChecked = iType
+                                break;
+                                case App.DragStarted:
+                                    if (qItem == item && !model.isSelected)
+                                    {
+                                        model.isSelected = 1
+                                        // invalidate the modifiers to force a single selection
+                                        mouseMods = -1
+                                    }
+                                break;
+                            }
+
+                            // forward the event to the parent node
+                            nodeContainer.mouseEvent(type, iID, iType, qItem, mouseMods)
                         }
-                    }
-                    Connections
-                    {
-                        target: item
-                        onClicked: nodeContainer.clicked(ID, qItem, mouseMods)
-                    }
-                    Connections
-                    {
-                        target: item
-                        onDoubleClicked: nodeContainer.doubleClicked(ID, Type)
                     }
                     Connections
                     {
                         ignoreUnknownSignals: true
                         target: item
                         onPathChanged: nodeContainer.pathChanged(oldPath, newPath)
+                    }
+                    Connections
+                    {
+                        ignoreUnknownSignals: true
+                        target: item
+                        onItemsDropped: nodeContainer.itemsDropped(path)
                     }
                 }
         }

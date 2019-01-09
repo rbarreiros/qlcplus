@@ -19,6 +19,7 @@
 
 #include <QCoreApplication>
 #include <QPluginLoader>
+#include <QSettings>
 #include <QDebug>
 
 #if defined(WIN32) || defined(Q_OS_WIN)
@@ -36,12 +37,10 @@
 IOPluginCache::IOPluginCache(QObject* parent)
     : QObject(parent)
 {
-    qDebug() << Q_FUNC_INFO;
 }
 
 IOPluginCache::~IOPluginCache()
 {
-    qDebug() << Q_FUNC_INFO;
     while (m_plugins.isEmpty() == false)
         delete m_plugins.takeFirst();
 }
@@ -53,6 +52,9 @@ void IOPluginCache::load(const QDir& dir)
     /* Check that we can access the directory */
     if (dir.exists() == false || dir.isReadable() == false)
         return;
+
+    QSettings settings;
+    QVariant hotplug = settings.value(SETTINGS_HOTPLUG);
 
     /* Loop through all files in the directory */
     QStringListIterator it(dir.entryList());
@@ -81,7 +83,8 @@ void IOPluginCache::load(const QDir& dir)
                 connect(ptr, SIGNAL(configurationChanged()),
                         this, SLOT(slotConfigurationChanged()));
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
-                HotPlugMonitor::connectListener(ptr);
+                if (hotplug.isValid() && hotplug.toBool() == true)
+                    HotPlugMonitor::connectListener(ptr);
 #endif
                 // QLCi18n::loadTranslation(p->name().replace(" ", "_"));
             }

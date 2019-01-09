@@ -17,15 +17,15 @@
   limitations under the License.
 */
 
-import QtQuick 2.3
-import QtQuick.Controls 1.2
+import QtQuick 2.8
+import QtQuick.Controls 2.1
 import QtQuick.Layouts 1.1
 
-import "DetachWindow.js" as WinLoader
 import "."
 
 Rectangle
 {
+    id: fixtureAndFunctions
     objectName: "fixturesAndFunctions"
     anchors.fill: parent
     color: "transparent"
@@ -35,7 +35,9 @@ Rectangle
     // string holding the current view. Used by the C++ code
     // for dynamic items creation
     property string currentView: "2D"
-    property bool docLoaded: qlcplus.docLoaded
+    //property bool docLoaded: qlcplus.docLoaded
+
+    Component.onCompleted: contextManager.updateFixturesCapabilities()
 
     function enableContext(ctx, setChecked)
     {
@@ -55,13 +57,17 @@ Rectangle
             if (setChecked)
                 item.checked = true
         }
+        settingsButton.checked = false
     }
 
-    onDocLoadedChanged:
+    function loadContext(checked, qmlres, ctx)
     {
-        // a new Doc has been loaded. Do here all the operations to
-        // reset/restore the view (active contexts are updated in C++)
-        viewUniverseCombo.model = ioManager.universeNames
+        if (checked === false)
+            return
+
+        settingsButton.checked = false
+        currentViewQML = qmlres
+        currentView = ctx
     }
 
     LeftPanel
@@ -115,29 +121,22 @@ Rectangle
                 id: rowLayout1
                 anchors.fill: parent
                 spacing: 5
-                ExclusiveGroup { id: menuBarGroup2 }
+                ButtonGroup { id: ffMenuBarGroup }
 
                 MenuBarEntry
                 {
                     id: uniView
                     imgSource: "uniview.svg"
                     entryText: qsTr("Universe View")
-                    checkable: true
                     checkedColor: UISettings.toolbarSelectionSub
                     bgGradient: ffMenuGradient
-                    exclusiveGroup: menuBarGroup2
-                    onCheckedChanged:
-                    {
-                        if (checked == true)
-                        {
-                            currentViewQML = "qrc:/UniverseGridView.qml"
-                            currentView = "UNIGRID"
-                        }
-                    }
+                    ButtonGroup.group: ffMenuBarGroup
+
+                    onCheckedChanged: loadContext(checked, "qrc:/UniverseGridView.qml", "UNIGRID")
                     onRightClicked:
                     {
                         uniView.visible = false
-                        WinLoader.createWindow("qrc:/UniverseGridView.qml")
+                        contextManager.detachContext("UNIGRID")
                     }
                 }
                 MenuBarEntry
@@ -145,22 +144,15 @@ Rectangle
                     id: dmxView
                     imgSource: "dmxview.svg"
                     entryText: qsTr("DMX View")
-                    checkable: true
                     checkedColor: UISettings.toolbarSelectionSub
                     bgGradient: ffMenuGradient
-                    exclusiveGroup: menuBarGroup2
-                    onCheckedChanged:
-                    {
-                        if (checked == true)
-                        {
-                            currentViewQML = "qrc:/DMXView.qml"
-                            currentView = "DMX"
-                        }
-                    }
+                    ButtonGroup.group: ffMenuBarGroup
+
+                    onCheckedChanged: loadContext(checked, "qrc:/DMXView.qml", "DMX")
                     onRightClicked:
                     {
                         dmxView.visible = false
-                        WinLoader.createWindow("qrc:/DMXView.qml")
+                        contextManager.detachContext("DMX")
                     }
                 }
                 MenuBarEntry
@@ -168,23 +160,16 @@ Rectangle
                     id: twodView
                     imgSource: "2dview.svg"
                     entryText: qsTr("2D View")
-                    checkable: true
                     checked: true
                     checkedColor: UISettings.toolbarSelectionSub
                     bgGradient: ffMenuGradient
-                    exclusiveGroup: menuBarGroup2
-                    onCheckedChanged:
-                    {
-                        if (checked == true)
-                        {
-                            currentViewQML = "qrc:/2DView.qml"
-                            currentView = "2D"
-                        }
-                    }
+                    ButtonGroup.group: ffMenuBarGroup
+
+                    onCheckedChanged: loadContext(checked, "qrc:/2DView.qml", "2D")
                     onRightClicked:
                     {
                         twodView.visible = false
-                        WinLoader.createWindow("qrc:/2DView.qml")
+                        contextManager.detachContext("2D")
                     }
                 }
                 MenuBarEntry
@@ -192,56 +177,63 @@ Rectangle
                     id: threedView
                     imgSource: "3dview.svg"
                     entryText: qsTr("3D View")
-                    checkable: true
                     checkedColor: UISettings.toolbarSelectionSub
                     bgGradient: ffMenuGradient
-                    exclusiveGroup: menuBarGroup2
+                    ButtonGroup.group: ffMenuBarGroup
+
                     onCheckedChanged:
                     {
-                        if (checked == true)
+                        if (checked)
                         {
-                            currentViewQML = "qrc:/3DView.qml"
-                            currentView = "3D"
+                            if (qlcplus.is3DSupported)
+                                loadContext(checked, "qrc:/3DView.qml", "3D")
+                            else
+                                loadContext(checked, "qrc:/3DViewUnsupported.qml", "3D")
                         }
                     }
                     onRightClicked:
                     {
-                        WinLoader.createWindow("qrc:/3DView.qml")
+                        threedView.visible = false
+                        contextManager.detachContext("3D")
                     }
                 }
 
                 CustomComboBox
                 {
                     id: viewUniverseCombo
-                    width: 100
-                    height: 26
+                    width: UISettings.bigItemHeight * 1.5
+                    height: viewToolbar.height - 4
                     anchors.margins: 1
-                    model: ioManager.universeNames
+                    model: ioManager.universesListModel
+                    currentValue: contextManager.universeFilter
 
-                    onCurrentIndexChanged:
+                    onValueChanged:
                     {
-                        // set the universe filter here
+                        contextManager.universeFilter = value
+                        fixtureManager.universeFilter = value
                     }
                 }
 
-                Rectangle { Layout.fillWidth: true }
+                Rectangle { Layout.fillWidth: true; color: "transparent" }
+
+                ZoomItem
+                {
+                    width: UISettings.iconSizeMedium * 2
+                    implicitHeight: viewToolbar.height - 2
+                    fontColor: UISettings.bgStrong
+                    onZoomOutClicked: previewLoader.item.setZoom(-0.5)
+                    onZoomInClicked: previewLoader.item.setZoom(0.5)
+                }
 
                 IconButton
                 {
                     id: settingsButton
-                    height: viewToolbar.height - 2
+                    implicitHeight: viewToolbar.height - 2
                     checkable: true
-                    imgSource: "qrc:/configure.svg"
+                    tooltip: qsTr("Show/hide the view settings")
+                    faColor: "white"
+                    faSource: FontAwesome.fa_bars
                     onToggled: previewLoader.item.showSettings(checked)
-                }
-
-                ZoomItem
-                {
-                    width: 70
-                    height: viewToolbar.height - 2
-                    fontColor: "#222"
-                    onZoomOutClicked: previewLoader.item.setZoom(-0.5)
-                    onZoomInClicked: previewLoader.item.setZoom(0.5)
                 }
             }
         }
@@ -250,7 +242,6 @@ Rectangle
         {
             id: previewLoader
             z: 0
-            //objectName: "editorLoader"
             anchors.top: viewToolbar.bottom
             width: centerView.width
             height: parent.height - viewToolbar.height

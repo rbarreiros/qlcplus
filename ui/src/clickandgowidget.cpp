@@ -129,6 +129,10 @@ void ClickAndGoWidget::setType(int type, const QLCChannel *chan)
         setupGradient(Qt::black, Qt::white);
     else if (type == UV)
         setupGradient(Qt::black, 0xFF9400D3);
+    else if (type == Lime)
+        setupGradient(Qt::black, 0xFFADFF2F);
+    else if (type == Indigo)
+        setupGradient(Qt::black, 0xFF4B0082);
     else if (type == RGB || type == CMY)
     {
         setupColorPicker();
@@ -162,6 +166,8 @@ QString ClickAndGoWidget::clickAndGoTypeToString(ClickAndGoWidget::ClickAndGo ty
         case Amber: return "Amber"; break;
         case White: return "White"; break;
         case UV: return "UV"; break;
+        case Lime: return "Lime"; break;
+        case Indigo: return "Indigo"; break;
         case RGB: return "RGB"; break;
         case CMY: return "CMY"; break;
         case Preset: return "Preset"; break;
@@ -179,6 +185,8 @@ ClickAndGoWidget::ClickAndGo ClickAndGoWidget::stringToClickAndGoType(QString st
     else if (str == "Amber") return Amber;
     else if (str == "White") return White;
     else if (str == "UV") return UV;
+    else if (str == "Lime") return Lime;
+    else if (str == "Indigo") return Indigo;
     else if (str == "RGB") return RGB;
     else if (str == "CMY") return CMY;
     else if (str == "Preset") return Preset;
@@ -236,14 +244,26 @@ void ClickAndGoWidget::createPresetList(const QLCChannel *chan)
 
     foreach(QLCCapability* cap, chan->capabilities())
     {
-        if (cap->resourceName().isEmpty() == false)
-            m_resources.append(PresetResource(cap->resourceName(), cap->name(),
+        if (cap->presetType() == QLCCapability::Picture)
+        {
+            m_resources.append(PresetResource(cap->resource(0).toString(), cap->name(),
                                               cap->min(), cap->max()));
-        else if (cap->resourceColor1().isValid())
-            m_resources.append(PresetResource(cap->resourceColor1(), cap->resourceColor2(),
-                                              cap->name(), cap->min(), cap->max()));
+        }
+        else if (cap->presetType() == QLCCapability::SingleColor)
+        {
+            QColor col1 = cap->resource(0).value<QColor>();
+            m_resources.append(PresetResource(col1, QColor(), cap->name(), cap->min(), cap->max()));
+        }
+        else if (cap->presetType() == QLCCapability::DoubleColor)
+        {
+            QColor col1 = cap->resource(0).value<QColor>();
+            QColor col2 = cap->resource(1).value<QColor>();
+            m_resources.append(PresetResource(col1, col2, cap->name(), cap->min(), cap->max()));
+        }
         else
+        {
             m_resources.append(PresetResource(i, cap->name(), cap->min(), cap->max()));
+        }
         i++;
     }
 }
@@ -275,7 +295,7 @@ void ClickAndGoWidget::setupPresetPicker()
         m_cellWidth = screen.width() / m_cols;
         m_width = m_cellWidth * m_cols;
     }
- 
+
     int x = 0;
     int y = 0;
     m_image = QImage(m_width, m_height, QImage::Format_RGB32);
@@ -305,8 +325,8 @@ void ClickAndGoWidget::setupPresetPicker()
         }
         else
             x += m_cellWidth;
-         
-    }  
+
+    }
 }
 
 QSize ClickAndGoWidget::sizeHint() const

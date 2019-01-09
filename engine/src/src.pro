@@ -34,8 +34,9 @@ win32:INCLUDEPATH += ./
 DEPENDPATH  += ../../hotplugmonitor/src
 INCLUDEPATH += ../../hotplugmonitor/src
 LIBS        += -L../../hotplugmonitor/src -lhotplugmonitor
-LIBS        += -L../audio/src -lqlcplusaudio
 }
+
+LIBS        += -L../audio/src -lqlcplusaudio
 
 #############################################################################
 # Sources
@@ -67,6 +68,7 @@ HEADERS += bus.h \
            channelsgroup.h \
            channelmodifier.h \
            chaser.h \
+           chaseraction.h \
            chaserrunner.h \
            chaserstep.h \
            collection.h \
@@ -77,12 +79,10 @@ HEADERS += bus.h \
            dmxsource.h \
            efx.h \
            efxfixture.h \
-           efxuistate.h \
            fadechannel.h \
            fixture.h \
            fixturegroup.h \
            function.h \
-           functionuistate.h \
            genericdmxsource.h \
            genericfader.h \
            gradient.h \
@@ -105,9 +105,9 @@ HEADERS += bus.h \
            rgbscriptscache.h \
            rgbtext.h \
            scene.h \
-           sceneuistate.h \
            scenevalue.h \
-           script.h \
+           scriptwrapper.h \
+           sequence.h \
            show.h \
            showfunction.h \
            showrunner.h \
@@ -115,9 +115,9 @@ HEADERS += bus.h \
            universe.h
 
 qmlui {
-  HEADERS += rgbscriptv4.h
+  HEADERS += rgbscriptv4.h scriptrunner.h scriptv4.h
 } else {
-  HEADERS += rgbscript.h
+  HEADERS += rgbscript.h script.h
 }
 
 win32:HEADERS += mastertimer-win32.h
@@ -157,12 +157,10 @@ SOURCES += bus.cpp \
            dmxdumpfactoryproperties.cpp \
            efx.cpp \
            efxfixture.cpp \
-           efxuistate.cpp \
            fadechannel.cpp \
            fixture.cpp \
            fixturegroup.cpp \
            function.cpp \
-           functionuistate.cpp \
            genericdmxsource.cpp \
            genericfader.cpp \
            gradient.cpp \
@@ -184,9 +182,8 @@ SOURCES += bus.cpp \
            rgbscriptscache.cpp \
            rgbtext.cpp \
            scene.cpp \
-           sceneuistate.cpp \
            scenevalue.cpp \
-           script.cpp \
+           sequence.cpp \
            show.cpp \
            showfunction.cpp \
            showrunner.cpp \
@@ -194,9 +191,9 @@ SOURCES += bus.cpp \
            universe.cpp
 
 qmlui {
-  SOURCES += rgbscriptv4.cpp
+  SOURCES += rgbscriptv4.cpp scriptrunner.cpp scriptv4.cpp
 } else {
-  SOURCES += rgbscript.cpp
+  SOURCES += rgbscript.cpp script.cpp
 }
 
 win32:SOURCES += mastertimer-win32.cpp
@@ -224,7 +221,7 @@ macx {
     LIBS += -framework CoreFoundation -framework CoreAudio -framework AudioToolbox
     # This must be after "TARGET = " and before target installation so that
     # install_name_tool can be run before target installation
-    include(../../macx/nametool.pri)
+    include(../../platforms/macos/nametool.pri)
 }
 
 target.path = $$INSTALLROOT/$$LIBSDIR
@@ -241,7 +238,7 @@ PRE_TARGETDEPS += $$CONFIGFILE
 QMAKE_CLEAN += $$CONFIGFILE
 QMAKE_DISTCLEAN += $$CONFIGFILE
 
-macx|win32 {
+macx|win32|appimage {
     conf.commands += echo \"$$LITERAL_HASH ifndef CONFIG_H\" > $$CONFIGFILE &&
     conf.commands += echo \"$$LITERAL_HASH define CONFIG_H\" >> $$CONFIGFILE &&
     conf.commands += echo \"$$LITERAL_HASH define APPNAME \\\"$$APPNAME\\\"\" >> $$CONFIGFILE &&
@@ -264,6 +261,11 @@ macx|win32 {
     conf.commands += echo \"$$LITERAL_HASH define USERRGBSCRIPTDIR \\\"$$USERRGBSCRIPTDIR\\\"\" >> $$CONFIGFILE &&
     conf.commands += echo \"$$LITERAL_HASH define GOBODIR \\\"$$GOBODIR\\\"\" >> $$CONFIGFILE &&
     conf.commands += echo \"$$LITERAL_HASH define WEBFILESDIR \\\"$$WEBFILESDIR\\\"\" >> $$CONFIGFILE &&
+qmlui {
+    conf.commands += echo \"$$LITERAL_HASH define MESHESDIR \\\"$$MESHESDIR\\\"\" >> $$CONFIGFILE &&
+    conf.commands += echo \"$$LITERAL_HASH define COLORFILTERSDIR \\\"$$COLORFILTERSDIR\\\"\" >> $$CONFIGFILE &&
+    conf.commands += echo \"$$LITERAL_HASH define USERCOLORFILTERSDIR \\\"$$USERCOLORFILTERSDIR\\\"\" >> $$CONFIGFILE &&
+}
     conf.commands += echo \"$$LITERAL_HASH endif\" >> $$CONFIGFILE
 }
 else:unix|android|ios {
@@ -289,6 +291,11 @@ else:unix|android|ios {
     conf.commands += echo \"$$LITERAL_HASH define USERRGBSCRIPTDIR \\\"$$USERRGBSCRIPTDIR\\\"\" >> $$CONFIGFILE &&
     conf.commands += echo \"$$LITERAL_HASH define GOBODIR \\\"$$INSTALLROOT/$$GOBODIR\\\"\" >> $$CONFIGFILE &&
     conf.commands += echo \"$$LITERAL_HASH define WEBFILESDIR \\\"$$INSTALLROOT/$$WEBFILESDIR\\\"\" >> $$CONFIGFILE &&
+qmlui {
+    conf.commands += echo \"$$LITERAL_HASH define MESHESDIR \\\"$$INSTALLROOT/$$MESHESDIR\\\"\" >> $$CONFIGFILE &&
+    conf.commands += echo \"$$LITERAL_HASH define COLORFILTERSDIR \\\"$$INSTALLROOT/$$COLORFILTERSDIR\\\"\" >> $$CONFIGFILE &&
+    conf.commands += echo \"$$LITERAL_HASH define USERCOLORFILTERSDIR \\\"$$USERCOLORFILTERSDIR\\\"\" >> $$CONFIGFILE &&
+}
     conf.commands += echo \"$$LITERAL_HASH endif\" >> $$CONFIGFILE
 }
 

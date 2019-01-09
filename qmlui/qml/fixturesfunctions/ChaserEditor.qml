@@ -19,8 +19,10 @@
 
 import QtQuick 2.0
 import QtQuick.Layouts 1.1
+import QtQuick.Controls 1.2
 
-import com.qlcplus.classes 1.0
+import org.qlcplus.classes 1.0
+import "TimeUtils.js" as TimeUtils
 import "."
 
 Rectangle
@@ -30,539 +32,276 @@ Rectangle
     color: "transparent"
 
     property int functionID: -1
+    property bool isSequence: chaserEditor.isSequence
 
     signal requestView(int ID, string qmlSrc)
 
-    ModelSelector
+    SplitView
     {
-        id: ceSelector
-        onItemsCountChanged:
+        anchors.fill: parent
+
+        Loader
         {
-            console.log("Chaser Editor selected items changed !")
-        }
-    }
-
-    Loader
-    {
-        id: funcMgrLoader
-        width: 0
-        height: ceContainer.height
-        source: ""
-
-        Rectangle
-        {
-            width: 2
-            height: parent.height
-            x: parent.width - 2
-            color: "#444"
-        }
-    }
-
-    Column
-    {
-        x: funcMgrLoader.width
-        width: funcMgrLoader.width ? ceContainer.width / 2 : ceContainer.width
-
-        Rectangle
-        {
-            color: UISettings.bgMedium
-            width: parent.width
-            height: 40
-            z: 2
+            id: funcMgrLoader
+            visible: width
+            width: 0
+            height: ceContainer.height
+            source: ""
 
             Rectangle
             {
-                id: backBox
-                width: 40
-                height: 40
-                color: "transparent"
-
-                Image
-                {
-                    id: leftArrow
-                    anchors.fill: parent
-                    rotation: 180
-                    source: "qrc:/arrow-right.svg"
-                    sourceSize: Qt.size(width, height)
-                }
-                MouseArea
-                {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: backBox.color = "#666"
-                    onExited: backBox.color = "transparent"
-                    onClicked:
-                    {
-                        if (funcMgrLoader.width)
-                        {
-                            funcMgrLoader.source = "";
-                            funcMgrLoader.width = 0;
-                            rightSidePanel.width = rightSidePanel.width / 2
-                        }
-
-                        requestView(-1, "qrc:/FunctionManager.qml")
-                    }
-                }
+                width: 2
+                height: parent.height
+                x: parent.width - 2
+                color: UISettings.bgLighter
             }
-            TextInput
-            {
-                id: cNameEdit
-                x: leftArrow.width + 5
-                height: 40
-                width: ceContainer.width - backBox.width - addFunc.width - removeFunc.width - 10
-                color: UISettings.fgMain
-                clip: true
-                text: chaserEditor.chaserName
-                verticalAlignment: TextInput.AlignVCenter
-                font.family: "RobotoCondensed"
-                font.pixelSize: 20
-                selectByMouse: true
-                Layout.fillWidth: true
+        }
 
-                onTextChanged: chaserEditor.chaserName = text
-            }
+        Column
+        {
+            Layout.fillWidth: true
 
-            IconButton
+            EditorTopBar
             {
-                id: addFunc
-                x: parent.width - 90
-                width: height
-                height: 38
-                imgSource: "qrc:/add.svg"
-                checkable: true
-                tooltip: qsTr("Add a function")
-                onCheckedChanged:
+                id: topbar
+                visible: !isSequence
+                text: chaserEditor.functionName
+                onTextChanged: chaserEditor.functionName = text
+
+                onBackClicked:
                 {
-                    if (checked)
+                    if (funcMgrLoader.width)
                     {
-                        rightSidePanel.width = rightSidePanel.width * 2
-                        funcMgrLoader.width = ceContainer.width / 2
-                        funcMgrLoader.source = "qrc:/FunctionManager.qml"
-                    }
-                    else
-                    {
-                        rightSidePanel.width = rightSidePanel.width / 2
                         funcMgrLoader.source = ""
                         funcMgrLoader.width = 0
+                        rightSidePanel.width = rightSidePanel.width / 2
                     }
+
+                    var prevID = chaserEditor.previousID
+                    functionManager.setEditorFunction(prevID, false, true)
+                    requestView(prevID, functionManager.getEditorResource(prevID))
                 }
-            }
 
-            IconButton
-            {
-                id: removeFunc
-                x: parent.width - 45
-                width: height
-                height: 38
-                imgSource: "qrc:/remove.svg"
-                tooltip: qsTr("Remove the selected function")
-                onClicked: {   }
-            }
-        }
-
-        Rectangle
-        {
-            id: chListHeader
-            width: parent.width
-            height: 35
-            color: UISettings.bgLight
-            property int fSize: 11
-
-            Row
-            {
-                height: 35
-                spacing: 2
-
-                // Step number column
-                RobotoText
+                IconButton
                 {
-                    id: numCol
-                    width: 20
-                    label: "#"
-                    wrapText: true
-                    textAlign: Text.AlignHCenter
-                    fontSize: chListHeader.fSize
-                }
-                Rectangle { height: 35; width: 1; color: UISettings.fgMedium }
+                    id: addFunc
+                    width: height
+                    height: UISettings.iconSizeMedium - 2
+                    imgSource: "qrc:/add.svg"
+                    checkable: true
+                    tooltip: qsTr("Add a new step")
 
-                // Step Function name column
-                RobotoText
-                {
-                    id: nameCol
-                    width: 120
-                    label: qsTr("Function")
-                    wrapText: true
-                    textAlign: Text.AlignHCenter
-                    fontSize: chListHeader.fSize
-                }
-                Rectangle
-                {
-                    id: nameColDrag
-                    height: 35
-                    width: 1
-                    color: UISettings.fgMedium
-
-                    MouseArea
+                    onCheckedChanged:
                     {
-                        anchors.fill: parent
-                        cursorShape: Qt.SizeHorCursor
-                        onPressed:
+                        if (checked)
                         {
-                            drag.target = nameColDrag
-                            drag.minimumX = 0
-                            drag.axis = Drag.XAxis
+                            rightSidePanel.width += mainView.width / 3
+                            funcMgrLoader.width = mainView.width / 3
+                            funcMgrLoader.source = "qrc:/FunctionManager.qml"
                         }
-                        onPositionChanged:
+                        else
                         {
-                            if (drag.target === null)
-                                return;
-                            nameCol.width = nameColDrag.x - nameCol.x - 1
+                            rightSidePanel.width = rightSidePanel.width - funcMgrLoader.width
+                            funcMgrLoader.source = ""
+                            funcMgrLoader.width = 0
                         }
-                        onReleased: drag.target = null
                     }
                 }
 
-                // Step fade in column
-                RobotoText
+                IconButton
                 {
-                    id: fInCol
-                    width: 60
-                    label: qsTr("Fade In")
-                    wrapText: true
-                    textAlign: Text.AlignHCenter
-                    fontSize: chListHeader.fSize
-                }
-                Rectangle
-                {
-                    id: fInColDrag
-                    height: 35
-                    width: 1
-                    color: UISettings.fgMedium
+                    id: removeFunc
+                    width: height
+                    height: UISettings.iconSizeMedium - 2
+                    imgSource: "qrc:/remove.svg"
+                    tooltip: qsTr("Remove the selected steps")
+                    onClicked: deleteItemsPopup.open()
 
-                    MouseArea
+                    CustomPopupDialog
                     {
-                        anchors.fill: parent
-                        cursorShape: Qt.SizeHorCursor
-                        onPressed:
-                        {
-                            drag.target = fInColDrag
-                            drag.minimumX = 0
-                            drag.axis = Drag.XAxis
-                        }
-                        onPositionChanged:
-                        {
-                            if (drag.target === null)
-                                return;
-                            fInCol.width = fInColDrag.x - fInCol.x - 1
-                        }
-                        onReleased: drag.target = null
+                        id: deleteItemsPopup
+                        title: qsTr("Delete steps")
+                        message: qsTr("Are you sure you want to remove the selected steps?")
+                        onAccepted: functionManager.deleteEditorItems(chWidget.selector.itemsList())
                     }
                 }
 
-                // Step hold column
-                RobotoText
+                IconButton
                 {
-                    id: holdCol
-                    width: 60
-                    label: qsTr("Hold")
-                    wrapText: true
-                    textAlign: Text.AlignHCenter
-                    fontSize: chListHeader.fSize
-                }
-                Rectangle
-                {
-                    id: holdColDrag
-                    height: 35
-                    width: 1
-                    color: UISettings.fgMedium
-
-                    MouseArea
-                    {
-                        anchors.fill: parent
-                        cursorShape: Qt.SizeHorCursor
-                        onPressed:
-                        {
-                            drag.target = holdColDrag
-                            drag.minimumX = 0
-                            drag.axis = Drag.XAxis
-                        }
-                        onPositionChanged:
-                        {
-                            if (drag.target === null)
-                                return;
-                            holdCol.width = holdColDrag.x - holdCol.x - 1
-                        }
-                        onReleased: drag.target = null
-                    }
-                }
-
-                // Step fade out column
-                RobotoText
-                {
-                    id: fOutCol
-                    width: 60
-                    label: qsTr("Fade Out")
-                    wrapText: true
-                    textAlign: Text.AlignHCenter
-                    fontSize: chListHeader.fSize
-                }
-                Rectangle
-                {
-                    id: fOutColDrag
-                    height: 35
-                    width: 1
-                    color: UISettings.fgMedium
-
-                    MouseArea
-                    {
-                        anchors.fill: parent
-                        cursorShape: Qt.SizeHorCursor
-                        onPressed:
-                        {
-                            drag.target = fOutColDrag
-                            drag.minimumX = 0
-                            drag.axis = Drag.XAxis
-                        }
-                        onPositionChanged:
-                        {
-                            if (drag.target === null)
-                                return;
-                            fOutCol.width = fOutColDrag.x - fOutCol.x - 1
-                        }
-                        onReleased: drag.target = null
-                    }
-                }
-
-                // Step duration column
-                RobotoText
-                {
-                    id: durCol
-                    width: 60
-                    label: qsTr("Duration")
-                    wrapText: true
-                    textAlign: Text.AlignHCenter
-                    fontSize: chListHeader.fSize
-                }
-                Rectangle
-                {
-                    id: durColDrag
-                    height: 35
-                    width: 1
-                    color: UISettings.fgMedium
-
-                    MouseArea
-                    {
-                        anchors.fill: parent
-                        cursorShape: Qt.SizeHorCursor
-                        onPressed:
-                        {
-                            drag.target = durColDrag
-                            drag.minimumX = 0
-                            drag.axis = Drag.XAxis
-                        }
-                        onPositionChanged:
-                        {
-                            if (drag.target === null)
-                                return;
-                            durCol.width = durColDrag.x - durCol.x - 1
-                        }
-                        onReleased: drag.target = null
-                    }
-                }
-
-                // Step note column
-                RobotoText
-                {
-                    id: noteCol
-                    width: 200
-                    label: qsTr("Note")
-                    fontSize: chListHeader.fSize
-                    //Layout.fillWidth: true
-                }
-            }
-        }
-
-        ListView
-        {
-            id: cStepsList
-            width: parent.width
-            height: ceContainer.height - 40 - chListHeader.height - chModes.height
-            boundsBehavior: Flickable.StopAtBounds
-            clip: true
-
-            property int dragInsertIndex: -1
-
-            model: chaserEditor.stepsList
-            delegate:
-                ChaserStepDelegate
-                {
-                    width: ceContainer.width
-                    functionID: modelData.funcID
-                    stepFadeIn: modelData.fadeIn
-                    stepHold: modelData.hold
-                    stepFadeOut: modelData.fadeOut
-                    stepDuration: modelData.duration
-                    stepNote: modelData.note
-
-                    col1Width: numCol.width
-                    col2Width: nameCol.width
-                    col3Width: fInCol.width
-                    col4Width: holdCol.width
-                    col5Width: fOutCol.width
-                    col6Width: durCol.width
-
-                    indexInList: index
-                    highlightIndex: cStepsList.dragInsertIndex
-
+                    id: printButton
+                    width: height
+                    height: UISettings.iconSizeMedium - 2
+                    imgSource: "qrc:/printer.svg"
+                    tooltip: qsTr("Print the Chaser steps")
                     onClicked:
                     {
-                        ceSelector.selectItem(ID, qItem, mouseMods & Qt.ControlModifier)
+                        chWidget.isPrinting = true
+                        qlcplus.printItem(chWidget)
                     }
-                }
-
-            DropArea
-            {
-                anchors.fill: parent
-                // accept only functions
-                keys: [ "function" ]
-
-                onDropped:
-                {
-                    console.log("Item dropped here. x: " + drag.x + " y: " + drag.y)
-                    console.log("Item fID: " + drag.source.funcID)
-                    chaserEditor.addFunction(drag.source.funcID, cStepsList.dragInsertIndex)
-                    cStepsList.dragInsertIndex = -1
-                }
-                onPositionChanged:
-                {
-                    var idx = cStepsList.indexAt(drag.x, drag.y)
-                    //console.log("Item index:" + idx)
-                    cStepsList.dragInsertIndex = idx
                 }
             }
-            ScrollBar { flickable: cStepsList }
-        }
 
-        SectionBox
-        {
-            id: chModes
-            width: parent.width
-            isExpanded: false
-            sectionLabel: qsTr("Run properties")
-
-            sectionContents:
-            GridLayout
+            ChaserWidget
             {
-                x: 4
-                width: parent.width - 8
-                columns: 6
-                columnSpacing: 4
-                rowSpacing: 4
+                id: chWidget
+                isSequence: ceContainer.isSequence
+                width: ceContainer.width
+                height: ceContainer.height - (topbar.visible ? topbar.height : 0) - chModes.height
+                model: chaserEditor.stepsList
+                playbackIndex: chaserEditor.playbackIndex
+                speedType: chaserEditor.stepsDuration
+                tempoType: chaserEditor.tempoType
+                isRunning: chaserEditor.previewEnabled
 
-                // Row 1
-                IconPopupButton
+                onIndexChanged: chaserEditor.playbackIndex = index
+                onStepValueChanged: chaserEditor.setStepSpeed(index, value, type)
+                onNoteTextChanged: chaserEditor.setStepNote(index, text)
+                onAddFunctions: chaserEditor.addFunctions(list, index)
+                onMoveSteps: chaserEditor.moveSteps(list, index)
+                onRequestEditor:
                 {
-                    ListModel
+                    functionManager.setEditorFunction(funcID, false, false)
+                    requestView(funcID, functionManager.getEditorResource(funcID))
+                }
+            }
+
+            SectionBox
+            {
+                id: chModes
+                width: parent.width
+                isExpanded: false
+                sectionLabel: qsTr("Run properties")
+
+                sectionContents:
+                GridLayout
+                {
+                    x: 4
+                    width: parent.width - 8
+                    columns: 6
+                    columnSpacing: 4
+                    rowSpacing: 4
+
+                    // Row 1
+                    IconPopupButton
                     {
-                        id: runOrderModel
-                        ListElement { mLabel: qsTr("Loop"); mIcon: "qrc:/loop.svg"; mValue: Function.Loop }
-                        ListElement { mLabel: qsTr("Single Shot"); mIcon: "qrc:/arrow-end.svg"; mValue: Function.SingleShot }
-                        ListElement { mLabel: qsTr("Ping Pong"); mIcon: "qrc:/pingpong.svg"; mValue: Function.PingPong }
-                        ListElement { mLabel: qsTr("Random"); mIcon: "qrc:/random.svg"; mValue: Function.Random }
+                        ListModel
+                        {
+                            id: runOrderModel
+                            ListElement { mLabel: qsTr("Loop"); mIcon: "qrc:/loop.svg"; mValue: QLCFunction.Loop }
+                            ListElement { mLabel: qsTr("Single Shot"); mIcon: "qrc:/arrow-end.svg"; mValue: QLCFunction.SingleShot }
+                            ListElement { mLabel: qsTr("Ping Pong"); mIcon: "qrc:/pingpong.svg"; mValue: QLCFunction.PingPong }
+                            ListElement { mLabel: qsTr("Random"); mIcon: "qrc:/random.svg"; mValue: QLCFunction.Random }
+                        }
+                        model: runOrderModel
+
+                        currentValue: chaserEditor.runOrder
+                        onValueChanged: chaserEditor.runOrder = value
                     }
-                    model: runOrderModel
-
-                    currentValue: chaserEditor.runOrder
-                    onValueChanged: chaserEditor.runOrder = value
-                }
-                RobotoText
-                {
-                    label: qsTr("Run Order")
-                    Layout.fillWidth: true
-                }
-
-                IconPopupButton
-                {
-                    ListModel
+                    RobotoText
                     {
-                        id: directionModel
-                        ListElement { mLabel: qsTr("Forward"); mIcon: "qrc:/forward.svg"; mValue: Function.Forward }
-                        ListElement { mLabel: qsTr("Backward"); mIcon: "qrc:/back.svg"; mValue: Function.Backward }
+                        label: qsTr("Run Order")
+                        Layout.fillWidth: true
                     }
-                    model: directionModel
 
-                    currentValue: chaserEditor.direction
-                    onValueChanged: chaserEditor.direction = value
-                }
-                RobotoText
-                {
-                    label: qsTr("Direction")
-                    Layout.fillWidth: true
-                }
-
-                Rectangle { height: 30; color: "transparent" }
-                Rectangle { height: 30; color: "transparent"; Layout.fillWidth: true }
-
-                // Row 2
-                IconPopupButton
-                {
-                    ListModel
+                    IconPopupButton
                     {
-                        id: fadeInModel
-                        ListElement { mLabel: qsTr("Default"); mTextIcon: "D"; mValue: Chaser.Default }
-                        ListElement { mLabel: qsTr("Common"); mTextIcon: "C"; mValue: Chaser.Common }
-                        ListElement { mLabel: qsTr("Per Step"); mTextIcon: "S"; mValue: Chaser.PerStep }
+                        ListModel
+                        {
+                            id: directionModel
+                            ListElement { mLabel: qsTr("Forward"); mIcon: "qrc:/forward.svg"; mValue: QLCFunction.Forward }
+                            ListElement { mLabel: qsTr("Backward"); mIcon: "qrc:/back.svg"; mValue: QLCFunction.Backward }
+                        }
+                        model: directionModel
+
+                        currentValue: chaserEditor.direction
+                        onValueChanged: chaserEditor.direction = value
                     }
-                    model: fadeInModel
-
-                    currentValue: chaserEditor.stepsFadeIn
-                    onValueChanged: chaserEditor.stepsFadeIn = value
-                }
-                RobotoText
-                {
-                    label: qsTr("Fade In")
-                    Layout.fillWidth: true
-                }
-
-                IconPopupButton
-                {
-                    ListModel
+                    RobotoText
                     {
-                        id: fadeOutModel
-                        ListElement { mLabel: qsTr("Default"); mTextIcon: "D"; mValue: Chaser.Default }
-                        ListElement { mLabel: qsTr("Common"); mTextIcon: "C"; mValue: Chaser.Common }
-                        ListElement { mLabel: qsTr("Per Step"); mTextIcon: "S"; mValue: Chaser.PerStep }
+                        label: qsTr("Direction")
+                        Layout.fillWidth: true
                     }
-                    model: fadeOutModel
 
-                    currentValue: chaserEditor.stepsFadeOut
-                    onValueChanged: chaserEditor.stepsFadeOut = value
-                }
-                RobotoText
-                {
-                    label: qsTr("Fade Out")
-                    Layout.fillWidth: true
-                }
-
-                IconPopupButton
-                {
-                    ListModel
+                    IconPopupButton
                     {
-                        id: durationModel
-                        ListElement { mLabel: qsTr("Common"); mTextIcon: "C"; mValue: Chaser.Common }
-                        ListElement { mLabel: qsTr("Per Step"); mTextIcon: "S"; mValue: Chaser.PerStep }
-                    }
-                    model: durationModel
+                        ListModel
+                        {
+                            id: tempoModel
+                            ListElement { mLabel: qsTr("Time"); mTextIcon: "T"; mValue: QLCFunction.Time }
+                            ListElement { mLabel: qsTr("Beats"); mTextIcon: "B"; mValue: QLCFunction.Beats }
+                        }
+                        model: tempoModel
 
-                    currentValue: chaserEditor.stepsDuration
-                    onValueChanged: chaserEditor.stepsDuration = value
-                }
-                RobotoText
-                {
-                    label: qsTr("Duration")
-                    Layout.fillWidth: true
-                }
-            } // end of GridLayout
-        } // end of Rectangle
-    } // end of Column
+                        currentValue: chaserEditor.tempoType
+                        onValueChanged: chaserEditor.tempoType = value
+                    }
+                    RobotoText
+                    {
+                        label: qsTr("Tempo")
+                        Layout.fillWidth: true
+                    }
+
+                    // Row 2
+                    IconPopupButton
+                    {
+                        ListModel
+                        {
+                            id: fadeInModel
+                            ListElement { mLabel: qsTr("Default"); mTextIcon: "D"; mValue: Chaser.Default }
+                            ListElement { mLabel: qsTr("Common"); mTextIcon: "C"; mValue: Chaser.Common }
+                            ListElement { mLabel: qsTr("Per Step"); mTextIcon: "S"; mValue: Chaser.PerStep }
+                        }
+                        model: fadeInModel
+
+                        currentValue: chaserEditor.stepsFadeIn
+                        onValueChanged: chaserEditor.stepsFadeIn = value
+                    }
+                    RobotoText
+                    {
+                        label: qsTr("Fade In")
+                        Layout.fillWidth: true
+                    }
+
+                    IconPopupButton
+                    {
+                        ListModel
+                        {
+                            id: fadeOutModel
+                            ListElement { mLabel: qsTr("Default"); mTextIcon: "D"; mValue: Chaser.Default }
+                            ListElement { mLabel: qsTr("Common"); mTextIcon: "C"; mValue: Chaser.Common }
+                            ListElement { mLabel: qsTr("Per Step"); mTextIcon: "S"; mValue: Chaser.PerStep }
+                        }
+                        model: fadeOutModel
+
+                        currentValue: chaserEditor.stepsFadeOut
+                        onValueChanged: chaserEditor.stepsFadeOut = value
+                    }
+                    RobotoText
+                    {
+                        label: qsTr("Fade Out")
+                        Layout.fillWidth: true
+                    }
+
+                    IconPopupButton
+                    {
+                        ListModel
+                        {
+                            id: durationModel
+                            ListElement { mLabel: qsTr("Common"); mTextIcon: "C"; mValue: Chaser.Common }
+                            ListElement { mLabel: qsTr("Per Step"); mTextIcon: "S"; mValue: Chaser.PerStep }
+                        }
+                        model: durationModel
+
+                        currentValue: chaserEditor.stepsDuration
+                        onValueChanged: chaserEditor.stepsDuration = value
+                    }
+                    RobotoText
+                    {
+                        label: qsTr("Duration")
+                        Layout.fillWidth: true
+                    }
+                } // end of GridLayout
+            } // end of SectionBox
+        } // end of Column
+    } // end of SplitView
 }
