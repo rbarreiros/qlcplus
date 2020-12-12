@@ -32,8 +32,17 @@ RadioButton
 
     property color bgColor: UISettings.bgControl
     property color hoverColor: UISettings.bgLight
-    property color pressColor: "#054A9E"
+    property color pressColor: UISettings.highlightPressed
     property string tooltip: ""
+
+    Rectangle
+    {
+        anchors.fill: parent
+        z: 3
+        color: "black"
+        opacity: 0.4
+        visible: !parent.enabled
+    }
 
     ToolTip
     {
@@ -55,7 +64,15 @@ RadioButton
               color: "white"
           }
     }
-
+/*
+    contentItem:
+        RobotoText
+        {
+            label: checkBoxRoot.text
+            opacity: checkBoxRoot.enabled ? 1.0 : 0.3
+            //color: control.down ? "#17a81a" : "#21be2b"
+        }
+*/
     background:
         Rectangle
         {

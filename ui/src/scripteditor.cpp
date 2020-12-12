@@ -55,13 +55,16 @@ ScriptEditor::ScriptEditor(QWidget* parent, Script* script, Doc* doc)
 
     /* Document */
     m_document = new QTextDocument(m_script->data(), this);
+#if (QT_VERSION < QT_VERSION_CHECK(5, 10, 0))
+    m_editor->setTabStopWidth(20);
+#else
+    m_editor->setTabStopDistance(20);
+#endif
     m_editor->setDocument(m_document);
     connect(m_document, SIGNAL(undoAvailable(bool)), m_undoButton, SLOT(setEnabled(bool)));
     m_document->setUndoRedoEnabled(false);
     m_document->setUndoRedoEnabled(true);
-#if QT_VERSION >= 0x040700
     m_document->clearUndoRedoStacks();
-#endif
 
     m_editor->moveCursor(QTextCursor::End);
     connect(m_document, SIGNAL(contentsChanged()), this, SLOT(slotContentsChanged()));
@@ -472,7 +475,7 @@ void ScriptEditor::slotCheckSyntax()
     }
     else
     {
-        QStringList lines = scriptText.split(QRegExp("(\r\n|\n\r|\r|\n)"), QString::KeepEmptyParts);
+        QStringList lines = scriptText.split(QRegExp("(\r\n|\n\r|\r|\n)"));
         foreach(int line, errLines)
         {
             errResult.append(tr("Syntax error at line %1:\n%2\n\n").arg(line).arg(lines.at(line - 1)));

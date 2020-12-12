@@ -19,6 +19,7 @@
 
 #include <QJSEngine>
 #include <QJSValue>
+#include <QRandomGenerator>
 #if !defined(Q_OS_IOS)
 #include <QProcess>
 #endif
@@ -80,8 +81,11 @@ void ScriptRunner::stop()
     m_startedFunctions.clear();
 
     // request to delete all the active faders
-    foreach (GenericFader *fader, m_fadersMap.values())
-        fader->requestDelete();
+    foreach (QSharedPointer<GenericFader> fader, m_fadersMap.values())
+    {
+        if (!fader.isNull())
+            fader->requestDelete();
+    }
     m_fadersMap.clear();
 }
 
@@ -145,8 +149,8 @@ bool ScriptRunner::write(MasterTimer *timer, QList<Universe *> universes)
         {
             FixtureValue val = m_fixtureValueQueue.dequeue();
 
-            GenericFader *fader = m_fadersMap.value(val.m_universe, NULL);
-            if (fader == NULL)
+            QSharedPointer<GenericFader> fader = m_fadersMap.value(val.m_universe, QSharedPointer<GenericFader>());
+            if (fader.isNull())
             {
                 fader = universes[val.m_universe]->requestFader();
                 //fader->adjustIntensity(getAttributeValue(Intensity));
@@ -518,7 +522,7 @@ int ScriptRunner::random(QString minTime, QString maxTime)
     int min = Function::stringToSpeed(minTime);
     int max = Function::stringToSpeed(maxTime);
 
-    return qrand() % ((max + 1) - min) + min;
+    return QRandomGenerator::global()->generate() % ((max + 1) - min) + min;
 }
 
 int ScriptRunner::random(int minTime, int maxTime)
@@ -526,6 +530,6 @@ int ScriptRunner::random(int minTime, int maxTime)
     if (m_running == false)
         return 0;
 
-    return qrand() % ((maxTime + 1) - minTime) + minTime;
+    return QRandomGenerator::global()->generate() % ((maxTime + 1) - minTime) + minTime;
 }
 

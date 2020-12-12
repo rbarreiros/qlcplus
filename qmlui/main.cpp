@@ -25,6 +25,10 @@
 #include "app.h"
 #include "qlcconfig.h"
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+#define endl Qt::endl
+#endif
+
 void debugMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
     Q_UNUSED(context)
@@ -103,11 +107,11 @@ int main(int argc, char *argv[])
 
     App qlcplusApp;
     qlcplusApp.setLanguage(locale);
-    qlcplusApp.startup();
 
     if (parser.isSet(kioskOption))
         qlcplusApp.enableKioskMode();
 
+    qlcplusApp.startup();
     qlcplusApp.show();
 
     QString filename = parser.value(openFileOption);

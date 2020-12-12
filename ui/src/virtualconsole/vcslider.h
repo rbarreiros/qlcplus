@@ -231,6 +231,8 @@ public:
         LevelChannel(quint32 fid, quint32 ch);
         /** Copy constructor */
         LevelChannel(const LevelChannel& lc);
+        /** Copy operator */
+        LevelChannel& operator=(const LevelChannel& lc);
         /** Comparison operator */
         bool operator==(const LevelChannel& lc) const;
         /** Sorting operator */
@@ -433,7 +435,7 @@ protected:
 
 private:
     /** Map used to lookup a GenericFader instance for a Universe ID */
-    QMap<quint32, GenericFader *> m_fadersMap;
+    QMap<quint32, QSharedPointer<GenericFader> > m_fadersMap;
 
     /*********************************************************************
      * Top label

@@ -359,6 +359,16 @@ void VCMatrix::editProperties()
         m_doc->setModified();
 }
 
+/*************************************************************************
+ * VCWidget-inherited
+ *************************************************************************/
+
+void VCMatrix::adjustIntensity(qreal val)
+{
+    VCWidget::adjustIntensity(val);
+    this->slotSliderMoved(this->m_slider->value());
+}
+
 /*********************************************************************
  * Function attachment
  *********************************************************************/
@@ -435,17 +445,6 @@ void VCMatrix::slotFunctionStopped()
     m_slider->blockSignals(true);
     m_slider->setValue(0);
     resetIntensityOverrideAttribute();
-    m_slider->blockSignals(false);
-}
-
-void VCMatrix::slotFunctionAttributeChanged(int attrIndex, qreal fraction)
-{
-    // Only use the Intensity attribute
-    if (attrIndex != 0)
-        return;
-
-    m_slider->blockSignals(true);
-    m_slider->setValue(int(floor((qreal(m_slider->maximum()) * fraction) + 0.5)));
     m_slider->blockSignals(false);
 }
 
@@ -743,7 +742,7 @@ void VCMatrix::resetCustomControls()
 QList<VCMatrixControl *> VCMatrix::customControls() const
 {
     QList<VCMatrixControl*> controls = m_controls.values();
-    qSort(controls.begin(), controls.end(), VCMatrixControl::compare);
+    std::sort(controls.begin(), controls.end(), VCMatrixControl::compare);
     return controls;
 }
 
@@ -989,7 +988,7 @@ bool VCMatrix::loadXML(QXmlStreamReader &root)
         {
             VCMatrixControl control(0xff);
             if (control.loadXML(root))
-                newControls.insert(qLowerBound(newControls.begin(), newControls.end(), control), control);
+                newControls.insert(std::lower_bound(newControls.begin(), newControls.end(), control), control);
         }
         else if (root.name() == KXMLQLCVCMatrixVisibilityMask)
         {

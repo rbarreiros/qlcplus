@@ -3,7 +3,7 @@
 <FixtureDefinition xmlns="http://www.qlcplus.org/FixtureDefinition">
  <Creator>
   <Name>Q Light Controller Plus</Name>
-  <Version>4.11.3 GIT</Version>
+  <Version>4.12.3 GIT</Version>
   <Author>Henning Borgen</Author>
  </Creator>
  <Manufacturer>Chauvet</Manufacturer>
@@ -45,13 +45,13 @@
   <Capability Min="50" Max="59" Preset="GoboMacro" Res1="Chauvet/gobo00001.svg">Gobo 5</Capability>
   <Capability Min="60" Max="69" Preset="GoboMacro" Res1="Others/gobo00034.png">Gobo 6 (Glass)</Capability>
   <Capability Min="70" Max="79" Preset="GoboMacro" Res1="Others/gobo00063.png">Gobo 7 (Glass)</Capability>
-  <Capability Min="80" Max="99" Preset="GoboMacro" Res1="Chauvet/gobo00042.svg">Gobo 1 Shake, Fast to Slow</Capability>
-  <Capability Min="100" Max="119" Preset="GoboMacro" Res1="ClayPaky/gobo00018.svg">Gobo 2 Shake, Fast to Slow</Capability>
-  <Capability Min="120" Max="139" Preset="GoboMacro" Res1="SGM/gobo00042.svg">Gobo 3 Shake, Fast to Slow</Capability>
-  <Capability Min="140" Max="159" Preset="GoboMacro" Res1="Others/gobo00027.svg">Gobo 4 Shake, Fast to Slow</Capability>
-  <Capability Min="160" Max="179" Preset="GoboMacro" Res1="Chauvet/gobo00001.svg">Gobo 5 Shake, Fast to Slow</Capability>
-  <Capability Min="180" Max="199" Preset="GoboMacro" Res1="Others/gobo00034.png">Gobo 6 (Glass) Shake, Fast to Slow</Capability>
-  <Capability Min="200" Max="219" Preset="GoboMacro" Res1="Others/gobo00063.png">Gobo 7 (Glass) Shake, Fast to Slow</Capability>
+  <Capability Min="80" Max="99" Preset="GoboShakeMacro" Res1="Chauvet/gobo00042.svg">Gobo 1 Shake, Fast to Slow</Capability>
+  <Capability Min="100" Max="119" Preset="GoboShakeMacro" Res1="ClayPaky/gobo00018.svg">Gobo 2 Shake, Fast to Slow</Capability>
+  <Capability Min="120" Max="139" Preset="GoboShakeMacro" Res1="SGM/gobo00042.svg">Gobo 3 Shake, Fast to Slow</Capability>
+  <Capability Min="140" Max="159" Preset="GoboShakeMacro" Res1="Others/gobo00027.svg">Gobo 4 Shake, Fast to Slow</Capability>
+  <Capability Min="160" Max="179" Preset="GoboShakeMacro" Res1="Chauvet/gobo00001.svg">Gobo 5 Shake, Fast to Slow</Capability>
+  <Capability Min="180" Max="199" Preset="GoboShakeMacro" Res1="Others/gobo00034.png">Gobo 6 (Glass) Shake, Fast to Slow</Capability>
+  <Capability Min="200" Max="219" Preset="GoboShakeMacro" Res1="Others/gobo00063.png">Gobo 7 (Glass) Shake, Fast to Slow</Capability>
   <Capability Min="220" Max="255">Gobo Scroll: Bidirectional rotation</Capability>
  </Channel>
  <Channel Name="Gobo Rotation">
@@ -84,16 +84,16 @@
   <Capability Min="35" Max="39">Gobo Wheel Move in Black (Disable)</Capability>
   <Capability Min="40" Max="44">All Movement Move in Black</Capability>
   <Capability Min="45" Max="49">All Movement Move in Black (disabled)</Capability>
-  <Capability Min="50" Max="54">Reset Pan/Tilt</Capability>
-  <Capability Min="55" Max="59">Reset Color Wheel</Capability>
-  <Capability Min="60" Max="64">Reset Gobo Wheel</Capability>
-  <Capability Min="65" Max="69">Reset Shutter</Capability>
-  <Capability Min="70" Max="74">Reset Focus</Capability>
-  <Capability Min="75" Max="79">Reset Prism</Capability>
-  <Capability Min="80" Max="89">Reset All</Capability>
+  <Capability Min="50" Max="54" Preset="ResetPanTilt">Reset Pan/Tilt</Capability>
+  <Capability Min="55" Max="59" Preset="ResetGobo">Reset Color Wheel</Capability>
+  <Capability Min="60" Max="64" Preset="ResetGobo">Reset Gobo Wheel</Capability>
+  <Capability Min="65" Max="69" Preset="ResetAll">Reset Shutter</Capability>
+  <Capability Min="70" Max="74" Preset="ResetAll">Reset Focus</Capability>
+  <Capability Min="75" Max="79" Preset="ResetPrism">Reset Prism</Capability>
+  <Capability Min="80" Max="89" Preset="ResetAll">Reset All</Capability>
   <Capability Min="90" Max="111">No Function</Capability>
-  <Capability Min="112" Max="119">Lamp Off</Capability>
-  <Capability Min="120" Max="127">Lamp On</Capability>
+  <Capability Min="112" Max="119" Preset="LampOff">Lamp Off</Capability>
+  <Capability Min="120" Max="127" Preset="LampOn">Lamp On</Capability>
   <Capability Min="128" Max="129">No Function</Capability>
   <Capability Min="130" Max="192">Auto Program</Capability>
   <Capability Min="193" Max="255">Sound Program</Capability>

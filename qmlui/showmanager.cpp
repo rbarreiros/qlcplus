@@ -17,6 +17,8 @@
   limitations under the License.
 */
 
+#include <QQmlContext>
+
 #include "showmanager.h"
 #include "sequence.h"
 #include "tardis.h"
@@ -36,6 +38,7 @@ ShowManager::ShowManager(QQuickView *view, Doc *doc, QObject *parent)
     , m_selectedTrack(-1)
     , m_itemsColor(Qt::gray)
 {
+    view->rootContext()->setContextProperty("showManager", this);
     qmlRegisterType<Track>("org.qlcplus.classes", 1, 0, "Track");
     qmlRegisterType<ShowFunction>("org.qlcplus.classes", 1, 0, "ShowFunction");
 
@@ -101,13 +104,13 @@ void ShowManager::setShowName(QString showName)
     emit showNameChanged(showName);
 }
 
-QQmlListProperty<Track> ShowManager::tracks()
+QList<Track *> ShowManager::tracks()
 {
     m_tracksList.clear();
     if (m_currentShow)
         m_tracksList = m_currentShow->tracks();
 
-    return QQmlListProperty<Track>(this, m_tracksList);
+    return m_tracksList;
 }
 
 int ShowManager::selectedTrack() const

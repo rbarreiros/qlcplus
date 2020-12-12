@@ -36,6 +36,7 @@ class FunctionManager;
 class GenericDMXSource;
 class MonitorProperties;
 class PreviewContext;
+class SimpleDesk;
 
 class ContextManager : public QObject
 {
@@ -55,7 +56,7 @@ class ContextManager : public QObject
 public:
     explicit ContextManager(QQuickView *view, Doc *doc,
                             FixtureManager *fxMgr, FunctionManager *funcMgr,
-                            QObject *parent = 0);
+                            SimpleDesk *sDesk, QObject *parent = 0);
     ~ContextManager();
 
     /** Register/Unregister a context to the map of known contexts */
@@ -129,6 +130,8 @@ private:
     FixtureManager *m_fixtureManager;
     /** Reference to the Function Manager */
     FunctionManager *m_functionManager;
+    /** Reference to the Simple Desk context */
+    SimpleDesk *m_simpleDesk;
 
     QMap <QString, PreviewContext *> m_contextsMap;
 
@@ -173,7 +176,7 @@ public:
     Q_INVOKABLE void toggleFixturesSelection();
 
     /** Select the fixtures that intersects the provided rectangle coordinates in a 2D environment */
-    Q_INVOKABLE void setRectangleSelection(qreal x, qreal y, qreal width, qreal height);
+    Q_INVOKABLE void setRectangleSelection(qreal x, qreal y, qreal width, qreal height, int keyModifiers);
 
     /** Returns if at least one fixture is currently selected */
     int selectedFixturesCount();
@@ -214,6 +217,11 @@ public:
     /** Select/Deselect all the fixtures of the Group/Universe with the provided $id */
     Q_INVOKABLE void setFixtureGroupSelection(quint32 id, bool enable, bool isUniverse);
 
+    /** Set a Pan/Tilt position in degrees */
+    Q_INVOKABLE void setPositionValue(int type, int degrees);
+
+    void setChannelValues(QList<SceneValue> values);
+
 protected slots:
     void slotNewFixtureCreated(quint32 fxID, qreal x, qreal y, qreal z = 0);
     void slotFixtureDeleted(quint32 itemID);
@@ -222,11 +230,13 @@ protected slots:
     void slotChannelValueChanged(quint32 fxID, quint32 channel, quint8 value);
     void slotChannelTypeValueChanged(int type, quint8 value, quint32 channel = UINT_MAX);
     void slotColorChanged(QColor col, QColor wauv);
-    void slotPositionChanged(int type, int degrees);
+
     void slotPresetChanged(const QLCChannel *channel, quint8 value);
 
-    /** Invoked by the QLC+ engine to inform the UI that the Universe at $idx
-     *  has changed */
+    void slotSimpleDeskValueChanged(quint32 fxID, quint32 channel, quint8 value);
+
+    /** Invoked by the QLC+ engine to inform the UI that the
+     *  Universe at $idx has changed */
     void slotUniverseWritten(quint32 idx, const QByteArray& ua);
 
     /** Invoked when Function editing begins or ends in the Function Manager.
@@ -241,7 +251,7 @@ signals:
     void fixturesRotationChanged();
 
 private:
-    /** The list of the currently selected Fixture IDs */
+    /** The list of the currently selected Fixture item IDs */
     QList<quint32> m_selectedFixtures;
 
     /** A flag indicating if a Function is currently being edited */
@@ -273,7 +283,10 @@ public:
     Q_ENUM(ChannelType)
 
     /** Store a channel value for Scene dumping */
-    void setDumpValue(quint32 fxID, quint32 channel, uchar value);
+    Q_INVOKABLE void setDumpValue(quint32 fxID, quint32 channel, uchar value, bool output = true);
+
+    /** Remove a channel from the Scene dumping list */
+    Q_INVOKABLE void unsetDumpValue(quint32 fxID, quint32 channel);
 
     /** Return the number of DMX channels currently available for dumping */
     int dumpValuesCount() const;
@@ -290,7 +303,6 @@ public:
 
     GenericDMXSource *dmxSource() const;
 
-private:
     /** Return a list only of the fixture IDs from the selected preview items */
     QList<quint32> selectedFixtureIDList() const;
 

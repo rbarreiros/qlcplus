@@ -1,9 +1,9 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE FixtureDefinition>
 <FixtureDefinition xmlns="http://www.qlcplus.org/FixtureDefinition">
  <Creator>
   <Name>Q Light Controller Plus</Name>
-  <Version>4.11.3 GIT</Version>
+  <Version>4.12.3 GIT</Version>
   <Author>Tavon Markov</Author>
  </Creator>
  <Manufacturer>Chauvet</Manufacturer>
@@ -59,15 +59,15 @@
   <Capability Min="42" Max="47" Preset="GoboMacro" Res1="Chauvet/gobo00042.svg">Gobo 7</Capability>
   <Capability Min="48" Max="53" Preset="GoboMacro" Res1="Chauvet/gobo00052.svg">Gobo 8</Capability>
   <Capability Min="54" Max="63" Preset="GoboMacro" Res1="Chauvet/gobo00053.svg">Gobo 9</Capability>
-  <Capability Min="64" Max="71" Preset="GoboMacro" Res1="Chauvet/gobo00053.svg">Gobo 9 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="72" Max="79" Preset="GoboMacro" Res1="Chauvet/gobo00052.svg">Gobo 8 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="80" Max="85" Preset="GoboMacro" Res1="Chauvet/gobo00042.svg">Gobo 7 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="86" Max="91" Preset="GoboMacro" Res1="Chauvet/gobo00050.png">Gobo 6 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="92" Max="97" Preset="GoboMacro" Res1="Chauvet/gobo00049.svg">Gobo 5 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="98" Max="103" Preset="GoboMacro" Res1="Chauvet/gobo00048.svg">Gobo 4 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="104" Max="109" Preset="GoboMacro" Res1="Chauvet/gobo00047.svg">Gobo 3 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="110" Max="115" Preset="GoboMacro" Res1="Chauvet/gobo00046.png">Gobo 2 Shake (Slow -&gt; Fast)</Capability>
-  <Capability Min="116" Max="121" Preset="GoboMacro" Res1="Chauvet/gobo00045.svg">Gobo 1 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="64" Max="71" Preset="GoboShakeMacro" Res1="Chauvet/gobo00053.svg">Gobo 9 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="72" Max="79" Preset="GoboShakeMacro" Res1="Chauvet/gobo00052.svg">Gobo 8 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="80" Max="85" Preset="GoboShakeMacro" Res1="Chauvet/gobo00042.svg">Gobo 7 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="86" Max="91" Preset="GoboShakeMacro" Res1="Chauvet/gobo00050.png">Gobo 6 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="92" Max="97" Preset="GoboShakeMacro" Res1="Chauvet/gobo00049.svg">Gobo 5 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="98" Max="103" Preset="GoboShakeMacro" Res1="Chauvet/gobo00048.svg">Gobo 4 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="104" Max="109" Preset="GoboShakeMacro" Res1="Chauvet/gobo00047.svg">Gobo 3 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="110" Max="115" Preset="GoboShakeMacro" Res1="Chauvet/gobo00046.png">Gobo 2 Shake (Slow -&gt; Fast)</Capability>
+  <Capability Min="116" Max="121" Preset="GoboShakeMacro" Res1="Chauvet/gobo00045.svg">Gobo 1 Shake (Slow -&gt; Fast)</Capability>
   <Capability Min="122" Max="127" Preset="GoboMacro" Res1="Others/open.svg">Open</Capability>
   <Capability Min="128" Max="191">Gobo Cycle (Slow -&gt; Fast)</Capability>
   <Capability Min="192" Max="255">Reverse Gobo Cycle (Slow -&gt; Fast)</Capability>
@@ -82,11 +82,11 @@
   <Capability Min="88" Max="107">Disable blackout while Pan/Tilt / moving Color Wheel</Capability>
   <Capability Min="108" Max="127">Disable blackout while moving Gobo/Color Wheel</Capability>
   <Capability Min="128" Max="147">Diable blackout while moving all options</Capability>
-  <Capability Min="148" Max="167">Reset Pan</Capability>
-  <Capability Min="168" Max="187">Reset Tilt</Capability>
-  <Capability Min="188" Max="207">Reset Color Wheel</Capability>
-  <Capability Min="208" Max="227">Reset Gobo Wheel</Capability>
-  <Capability Min="228" Max="247">Reset All Channels</Capability>
+  <Capability Min="148" Max="167" Preset="ResetPan">Reset Pan</Capability>
+  <Capability Min="168" Max="187" Preset="ResetTilt">Reset Tilt</Capability>
+  <Capability Min="188" Max="207" Preset="ResetColor">Reset Color Wheel</Capability>
+  <Capability Min="208" Max="227" Preset="ResetGobo">Reset Gobo Wheel</Capability>
+  <Capability Min="228" Max="247" Preset="ResetAll">Reset All Channels</Capability>
   <Capability Min="248" Max="255">No Function</Capability>
  </Channel>
  <Channel Name="Movement Macros">

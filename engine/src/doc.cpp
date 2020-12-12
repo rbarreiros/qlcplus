@@ -26,6 +26,9 @@
 #include <QList>
 #include <QTime>
 #include <QDir>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
+#include <QRandomGenerator>
+#endif
 
 #include "qlcfixturemode.h"
 #include "qlcfixturedef.h"
@@ -79,12 +82,16 @@ Doc::Doc(QObject* parent, int universes)
     , m_latestFixtureId(0)
     , m_latestFixtureGroupId(0)
     , m_latestChannelsGroupId(0)
+    , m_latestPaletteId(0)
     , m_latestFunctionId(0)
     , m_startupFunctionId(Function::invalidId())
 {
     Bus::init(this);
     resetModified();
+#if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
     qsrand(QTime::currentTime().msec());
+#endif
+    
 }
 
 Doc::~Doc()
@@ -134,7 +141,16 @@ void Doc::clearContents()
         delete func;
     }
 
-    // Delete all channels groups
+    // Delete all palettes
+    QListIterator <quint32> palIt(m_palettes.keys());
+    while (palIt.hasNext() == true)
+    {
+        QLCPalette *palette = m_palettes.take(palIt.next());
+        emit paletteRemoved(palette->id());
+        delete palette;
+    }
+
+    // Delete all channel groups
     QListIterator <quint32> grpchans(m_channelsGroups.keys());
     while (grpchans.hasNext() == true)
     {
@@ -170,6 +186,7 @@ void Doc::clearContents()
     m_latestFixtureId = 0;
     m_latestFixtureGroupId = 0;
     m_latestChannelsGroupId = 0;
+    m_latestPaletteId = 0;
     m_addresses.clear();
     m_loadStatus = Cleared;
 
@@ -890,6 +907,79 @@ quint32 Doc::createChannelsGroupId()
     return m_latestChannelsGroupId;
 }
 
+/*********************************************************************
+ * Palettes
+ *********************************************************************/
+
+bool Doc::addPalette(QLCPalette *palette, quint32 id)
+{
+    Q_ASSERT(palette != NULL);
+
+    // No ID given, this method can assign one
+    if (id == QLCPalette::invalidId())
+        id = createPaletteId();
+
+    if (m_palettes.contains(id) == true || id == QLCPalette::invalidId())
+    {
+        qWarning() << Q_FUNC_INFO << "a palette with ID" << id << "already exists!";
+        return false;
+    }
+    else
+    {
+        palette->setID(id);
+        m_palettes[id] = palette;
+
+        emit paletteAdded(id);
+        setModified();
+    }
+
+    return true;
+}
+
+bool Doc::deletePalette(quint32 id)
+{
+    if (m_palettes.contains(id) == true)
+    {
+        QLCPalette *palette = m_palettes.take(id);
+        Q_ASSERT(palette != NULL);
+
+        emit paletteRemoved(id);
+        setModified();
+        delete palette;
+
+        return true;
+    }
+    else
+    {
+        qWarning() << Q_FUNC_INFO << "No palette with id" << id;
+        return false;
+    }
+}
+
+QLCPalette *Doc::palette(quint32 id) const
+{
+    if (m_palettes.contains(id) == true)
+        return m_palettes[id];
+    else
+        return NULL;
+}
+
+QList<QLCPalette *> Doc::palettes() const
+{
+    return m_palettes.values();
+}
+
+quint32 Doc::createPaletteId()
+{
+    while (m_palettes.contains(m_latestPaletteId) == true ||
+           m_latestPaletteId == FixtureGroup::invalidId())
+    {
+        m_latestPaletteId++;
+    }
+
+    return m_latestPaletteId;
+}
+
 /*****************************************************************************
  * Functions
  *****************************************************************************/
@@ -1161,6 +1251,11 @@ bool Doc::loadXML(QXmlStreamReader &doc)
         {
             ChannelsGroup::loader(doc, this);
         }
+        else if (doc.name() == KXMLQLCPalette)
+        {
+            QLCPalette::loader(doc, this);
+            doc.skipCurrentElement();
+        }
         else if (doc.name() == KXMLQLCFunction)
         {
             //qDebug() << doc.attributes().value("Name").toString();
@@ -1200,10 +1295,9 @@ bool Doc::saveXML(QXmlStreamWriter *doc)
 
     /* Create the master Engine node */
     doc->writeStartElement(KXMLQLCEngine);
+
     if (startupFunction() != Function::invalidId())
-    {
         doc->writeAttribute(KXMLQLCStartupFunction, QString::number(startupFunction()));
-    }
 
     m_ioMap->saveXML(doc);
 
@@ -1211,7 +1305,7 @@ bool Doc::saveXML(QXmlStreamWriter *doc)
     QListIterator <Fixture*> fxit(fixtures());
     while (fxit.hasNext() == true)
     {
-        Fixture* fxi(fxit.next());
+        Fixture *fxi(fxit.next());
         Q_ASSERT(fxi != NULL);
         fxi->saveXML(doc);
     }
@@ -1220,7 +1314,7 @@ bool Doc::saveXML(QXmlStreamWriter *doc)
     QListIterator <FixtureGroup*> grpit(fixtureGroups());
     while (grpit.hasNext() == true)
     {
-        FixtureGroup* grp(grpit.next());
+        FixtureGroup *grp(grpit.next());
         Q_ASSERT(grp != NULL);
         grp->saveXML(doc);
     }
@@ -1229,16 +1323,25 @@ bool Doc::saveXML(QXmlStreamWriter *doc)
     QListIterator <ChannelsGroup*> chanGroups(channelsGroups());
     while (chanGroups.hasNext() == true)
     {
-        ChannelsGroup* grp(chanGroups.next());
+        ChannelsGroup *grp(chanGroups.next());
         Q_ASSERT(grp != NULL);
         grp->saveXML(doc);
+    }
+
+    /* Write palettes into an XML document */
+    QListIterator <QLCPalette*> paletteIt(palettes());
+    while (paletteIt.hasNext() == true)
+    {
+        QLCPalette *palette(paletteIt.next());
+        Q_ASSERT(palette != NULL);
+        palette->saveXML(doc);
     }
 
     /* Write functions into an XML document */
     QListIterator <Function*> funcit(functions());
     while (funcit.hasNext() == true)
     {
-        Function* func(funcit.next());
+        Function *func(funcit.next());
         Q_ASSERT(func != NULL);
         func->saveXML(doc);
     }

@@ -143,6 +143,7 @@ QComboBox *DMXUSBConfig::createTypeCombo(DMXUSBWidget *widget)
     combo->setProperty(PROP_SERIAL, widget->serial());
     combo->addItem(QString("Pro RX/TX"), DMXUSBWidget::ProRXTX);
     combo->addItem(QString("Open TX"), DMXUSBWidget::OpenTX);
+    combo->addItem(QString("Open RX"), DMXUSBWidget::OpenRX);
     combo->addItem(QString("Pro Mk2"), DMXUSBWidget::ProMk2);
     combo->addItem(QString("Ultra Pro"), DMXUSBWidget::UltraPro);
     combo->addItem(QString("DMX4ALL"), DMXUSBWidget::DMX4ALL);
@@ -161,7 +162,7 @@ QSpinBox *DMXUSBConfig::createFrequencySpin(DMXUSBWidget *widget)
     Q_ASSERT(widget != NULL);
     QSpinBox *spin = new QSpinBox;
     spin->setProperty(PROP_SERIAL, widget->serial());
-    spin->setProperty(PROP_WIDGET, qVariantFromValue((void *)widget));
+    spin->setProperty(PROP_WIDGET, QVariant::fromValue((void *)widget));
     spin->setRange(1, 60);
     spin->setValue(widget->outputFrequency());
     spin->setSuffix("Hz");

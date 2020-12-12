@@ -200,40 +200,24 @@ void MasterTimer::stopAllFunctions()
 
 void MasterTimer::fadeAndStopAll(int timeout)
 {
-    if (timeout == 0)
-        return;
-
-    Doc* doc = qobject_cast<Doc*> (parent());
-    Q_ASSERT(doc != NULL);
-
-    QList<FadeChannel> fcList;
-
-    QList<Universe *> universes = doc->inputOutputMap()->claimUniverses();
-    for (int i = 0; i < universes.count(); i++)
+    if (timeout)
     {
-        QHashIterator <int,uchar> it(universes[i]->intensityChannels());
-        while (it.hasNext() == true)
-        {
-            it.next();
+        Doc *doc = qobject_cast<Doc*> (parent());
+        Q_ASSERT(doc != NULL);
 
-            Fixture* fxi = doc->fixture(doc->fixtureForAddress(it.key()));
-            if (fxi != NULL)
+        QList<Universe *> universes = doc->inputOutputMap()->claimUniverses();
+        foreach (Universe *universe, universes)
+        {
+            foreach (QSharedPointer<GenericFader> fader, universe->faders())
             {
-                uint ch = it.key() - fxi->universeAddress();
-                if (fxi->channelCanFade(ch))
-                {
-                    FadeChannel fc(doc, fxi->id(), ch);
-                    fc.setStart(it.value());
-                    fc.setTarget(0);
-                    fc.setFadeTime(timeout);
-                    fcList.append(fc);
-                }
+                if (!fader.isNull() && fader->parentFunctionID() != Function::invalidId())
+                    fader->setFadeOut(true, uint(timeout));
             }
         }
+        doc->inputOutputMap()->releaseUniverses();
     }
-    doc->inputOutputMap()->releaseUniverses();
 
-    // Stop all functions first
+    // At last, stop all functions
     stopAllFunctions();
 }
 

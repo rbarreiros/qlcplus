@@ -17,6 +17,7 @@ QML_IMPORT_PATH =
 # Engine
 INCLUDEPATH     += ../engine/src ../engine/audio/src
 INCLUDEPATH     += virtualconsole
+INCLUDEPATH     += fixtureeditor
 INCLUDEPATH     += tardis
 INCLUDEPATH     += ../plugins/interfaces
 DEPENDPATH      += ../engine/src
@@ -46,11 +47,13 @@ HEADERS += \
     mainview3d.h \
     mainviewdmx.h \
     modelselector.h \
+    palettemanager.h \
     previewcontext.h \
     rgbmatrixeditor.h \
     sceneeditor.h \
     scripteditor.h \
     showmanager.h \
+    simpledesk.h \
     treemodel.h \
     treemodelitem.h \
     videoeditor.h \
@@ -77,11 +80,13 @@ SOURCES += main.cpp \
     mainview3d.cpp \
     mainviewdmx.cpp \
     modelselector.cpp \
+    palettemanager.cpp \
     previewcontext.cpp \
     rgbmatrixeditor.cpp \
     sceneeditor.cpp \
     scripteditor.cpp \
     showmanager.cpp \
+    simpledesk.cpp \
     treemodel.cpp \
     treemodelitem.cpp \
     videoeditor.cpp \
@@ -131,6 +136,24 @@ SOURCES += \
     virtualconsole/vcclock.cpp \
     virtualconsole/vccuelist.cpp
 
+#############################################
+#  Fixture Definition Editor
+#############################################
+
+HEADERS += \
+    fixtureeditor/fixtureeditor.h \
+    fixtureeditor/editorview.h \
+    fixtureeditor/channeledit.h \
+    fixtureeditor/modeedit.h \
+    fixtureeditor/physicaledit.h
+
+SOURCES += \
+    fixtureeditor/fixtureeditor.cpp \
+    fixtureeditor/editorview.cpp \
+    fixtureeditor/channeledit.cpp \
+    fixtureeditor/modeedit.cpp \
+    fixtureeditor/physicaledit.cpp
+
 RESOURCES += qmlui.qrc ../resources/icons/svg/svgicons.qrc ../resources/fonts/fonts.qrc
 
 lupdate_only {
@@ -151,6 +174,7 @@ TRANSLATIONS += \
     qlcplus_it_IT.ts \
     qlcplus_ja_JP.ts \
     qlcplus_nl_NL.ts \
+    qlcplus_pl_PL.ts \
     qlcplus_ru_RU.ts \
     qlcplus_uk_UA.ts
 

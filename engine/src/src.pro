@@ -56,6 +56,7 @@ HEADERS += avolitesd4parser.h \
            qlcinputprofile.h \
            qlcinputsource.h \
            qlcmodifierscache.h \
+           qlcpalette.h \
            qlcphysical.h \
            utils.h
 
@@ -91,6 +92,7 @@ HEADERS += bus.h \
            inputoutputmap.h \
            inputpatch.h \
            ioplugincache.h \
+           keypadparser.h \
            mastertimer.h \
            monitorproperties.h \
            outputpatch.h \
@@ -137,6 +139,7 @@ SOURCES += avolitesd4parser.cpp \
            qlcinputprofile.cpp \
            qlcinputsource.cpp \
            qlcmodifierscache.cpp \
+           qlcpalette.cpp \
            qlcphysical.cpp
 
 greaterThan(QT_MAJOR_VERSION, 4) {
@@ -169,6 +172,7 @@ SOURCES += bus.cpp \
            inputoutputmap.cpp \
            inputpatch.cpp \
            ioplugincache.cpp \
+           keypadparser.cpp \
            mastertimer.cpp \
            monitorproperties.cpp \
            outputpatch.cpp \

@@ -50,6 +50,22 @@ ChaserStep::ChaserStep(const ChaserStep& cs)
 {
 }
 
+ChaserStep &ChaserStep::operator=(const ChaserStep &step)
+{
+    if (this != &step)
+    {
+        fid = step.fid;
+        fadeIn = step.fadeIn;
+        hold = step.hold;
+        fadeOut = step.fadeOut;
+        duration = step.duration;
+        values = step.values;
+        note = step.note;
+    }
+
+    return *this;
+}
+
 bool ChaserStep::operator==(const ChaserStep& cs) const
 {
     return (fid == cs.fid) ? true : false;
@@ -71,7 +87,7 @@ int ChaserStep::setValue(SceneValue value, int index, bool *created)
         if (index == -1)
         {
             values.append(value);
-            qSort(values.begin(), values.end());
+            std::sort(values.begin(), values.end());
             if (created != NULL)
                 *created = true;
             return values.indexOf(value);
